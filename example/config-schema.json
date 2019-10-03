@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "$schema",
+    "spreadsheets"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "default": ""
+    },
+    "spreadsheets": {
+      "type": "array",
+      "title": "Spreadsheets to load",
+      "items": {
+        "type": "object",
+        "title": "One spreadsheet to load",
+        "required": [
+          "spreadsheetId",
+          "sheets"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "spreadsheetId": {
+            "type": "string",
+            "title": "Part of the Google URL to load the spreadsheet",
+            "examples": [
+              "1b39RL4KQJxdhHYXVmkk-loZK1IKjSDU_ggno3rZCkx6"
+            ],
+            "pattern": "^[0-9a-zA-Z_/-]{44}$"
+          },
+          "sheets": {
+            "type": "object",
+            "title": "The sheets to load (optional)"
+          }
+        }
+      }
+    }
+  }
+}

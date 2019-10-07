@@ -6,6 +6,19 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class Tasks
 {
+    private /* GoogleSheetsAgent */ $googleSheetsAgent;
+    private /* DatabaseAgent */ $databaseAgent;
+
+    function __construct(string $credentialsFile, \PDO $database)
+    {
+        $this->googleSheetsAgent =  new GoogleSheetsAgent($credentialsFile);
+        $this->databaseAgent = DatabaseAgent::AgentForPDO($database);
+        $this->databaseAgent->setupDatabase();
+    }
+
+}
+
+class OTHerCoDe {
     function setConfiguration(array $newConfiguration)
     {
         foreach ($newConfiguration as $newSpreadsheetConfiguration) {

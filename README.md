@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/fulldecent/google-sheets-etl?branch=master)](https://travis-ci.com/fulldecent/google-sheets-etl)
+[![Build Status](https://travis-ci.com/fulldecent/google-sheets-etl.svg?branch=master)](https://travis-ci.com/fulldecent/google-sheets-etl)
 
 Google Sheets ETL
 =================
@@ -20,8 +20,6 @@ First set up the project dependencies by installing Composer and running:
 ```sh
 composer install
 ```
-
-
 
 Next, create a Google Service Account. This requires 20 steps so we made a [a step-by-step illustrated guide](GOOGLE-SETUP.md).
 

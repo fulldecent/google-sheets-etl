@@ -8,8 +8,20 @@ abstract class DatabaseAgent
 {
     protected /* \PDO */ $database;
     protected /* ?string */ $loadTime;
+
+    static function AgentForPDO(\PDO $newDatabase): DatabaseAgent
+    {
+        switch ($newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
+            case 'sqlite':
+                return new DatabaseAgentSqlite($newDatabase);
+                break;
+            default:
+                echo "Unexpected driver: " . $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
+                exit(1);
+        }
+    }
     
-    function __construct(\PDO $newDatabase)
+    protected function __construct(\PDO $newDatabase)
     {
         $this->database = $newDatabase;
         $this->loadTime = date('Y-m-d H:i:s');

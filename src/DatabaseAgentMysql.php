@@ -1,4 +1,8 @@
 <?php
+
+TODO
+MYSQL Implementation is incomplete
+
 namespace fulldecent\GoogleSheetsEtl;
 
 /**

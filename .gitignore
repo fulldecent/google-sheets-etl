@@ -9,3 +9,5 @@ composer.phar
 # google-sheets-etl specific additions
 *google*json
 *.db
+/local
+!/local/README.md

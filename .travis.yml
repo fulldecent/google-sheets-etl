@@ -10,8 +10,6 @@ php:
   - 7.3
   - latest
 
-sudo: false
-
 cache:
   directories:
     - vendor

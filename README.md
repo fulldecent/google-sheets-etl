@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/fulldecent/google-sheets-etl?branch=master)](https://travis-ci.org/fulldecent/google-sheets-etl)
+[![Build Status](https://travis-ci.com/fulldecent/google-sheets-etl?branch=master)](https://travis-ci.com/fulldecent/google-sheets-etl)
 
 Google Sheets ETL
 =================

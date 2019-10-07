@@ -64,3 +64,5 @@ Then you have to open that project (it takes a moment to create).
 ![20 view key](GOOGLE-SETUP.assets/20 view key.png)
 
 The client_email is the email address for your service account. You will share your Google Sheets with that account, or entire folders from Google Drive.
+
+Save that key file to your `local` folder in the project folder.

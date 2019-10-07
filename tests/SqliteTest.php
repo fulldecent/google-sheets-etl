@@ -8,23 +8,23 @@ $database = new \PDO('sqlite::memory:', null, null, [
   \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
 ]);
 
-$databaseAgent = new DatabaseAgent($database);
-$databaseAgent->setupDatabaseSqlite();
+$databaseAgent = new DatabaseAgentSqlite($database);
+$databaseAgent->setupDatabase();
 
-/*
-var_dump($database->query('SELECT * FROM sqlite_master')->fetchAll(\PDO::FETCH_OBJ));
-var_dump($databaseAgent->getLatestMotidifedTime());
-var_dump($databaseAgent->getGreatestIdWithAuthorizationCheckedSince('2000-02-03'));
-*/
-echo '--- ---' . PHP_EOL;
-echo '--- ---' . PHP_EOL;
+## Test ########################################################################
+echo "Checking table created" . PHP_EOL;
+$tableCount = $database->query('SELECT COUNT(*) FROM sqlite_master WHERE name ="__meta_table_index"')->fetchColumn();
+assert ($tableCount == 1);
+echo "~~ Passed" . PHP_EOL . PHP_EOL;
 
+## Test ########################################################################
 $headers = ['col 1', 'col 2'];
 $data = [
   ['a', 'b'],
   ['c', 'd']
 ];
-$databaseAgent->loadSheet('17azPU9lRfRMzFFbwj4SREN-jbzCalUvUWpDHAYCZ1vs', 'sname', 'now', $headers, $data);
+$tableName = '17azPU9lRfRMzFFbwj4SREN-jbzCalUvUWpDHAYCZ1vs-sname';
+$databaseAgent->loadSheet('17azPU9lRfRMzFFbwj4SREN-jbzCalUvUWpDHAYCZ1vs', 'sname', 'now', $headers, $data, $tableName);
 
 var_dump($database->query('SELECT * FROM __meta_table_index')->fetchAll(\PDO::FETCH_OBJ));
-var_dump($database->query('SELECT * FROM `17azPU9lRfRMzFFbwj4SREN-jbzCalUvUWpDHAYCZ1vs-sname`')->fetchAll(\PDO::FETCH_OBJ));
+var_dump($database->query("SELECT * FROM `$tableName`")->fetchAll(\PDO::FETCH_OBJ));

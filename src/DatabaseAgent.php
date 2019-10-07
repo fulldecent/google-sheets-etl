@@ -21,42 +21,6 @@ abstract class DatabaseAgent
 
     abstract function insertRows(string $quotedFullyQualifiedTableName, array $rows);
 
-    abstract function storeAccounting(string $spreadsheetId, string $sheetName, string $modifiedTime, string $unqualifiedTableName);
-    
-    /**
-     * The latest modified time in the database
-     *
-     * @see https://tools.ietf.org/html/rfc3339
-     * 
-     * @return ?string The time, or a default value before Google Drive existed
-     */
-    function getLatestMotidifedTime(): ?string {
-echo 'TODO: refactor this so that it get the last spreadsheet that was fully loaded. As current the way this is used it can skip other sheets on reload if one sheet causes a crash' . PHP_EOL;
-        $quotedFullyQualifiedMetaTableName = $this->getQuotedFullyQualifiedMetaTableName();
-        $sql = <<<SQL
-SELECT MAX(last_modified)
-  FROM $quotedFullyQualifiedMetaTableName
- WHERE last_modified = last_loaded
-SQL;
-        return $this->database->query($sql)->fetchColumn();
-    }
-
-    /**
-     * @param string $date YYYY-MM-DD format
-     */
-    function getGreatestIdWithAuthorizationCheckedSince(string $date)
-    {
-        $quotedFullyQualifiedMetaTableName = $this->getQuotedFullyQualifiedMetaTableName();
-        $sql = <<<SQL
-SELECT MAX(spreadsheet_id)
-  FROM $quotedFullyQualifiedMetaTableName
- WHERE last_authorization_checked >= ?
-SQL;
-        $statement = $this->database->prepare($sql);
-        $statement->execute([$date]);
-        return $statement->fetchColumn();
-    }
-
     /**
      * Load one Google Sheets grid sheet into the database
      * 
@@ -72,7 +36,32 @@ SQL;
         $this->database->beginTransaction();
         $this->createTable($unqualifiedTableName, $columns);
         $this->insertRows($unqualifiedTableName, $rows);
-        $this->storeAccounting($spreadsheetId, $sheetName, $modifiedTime, $unqualifiedTableName);
+        $this->storeALocation($spreadsheetId, $sheetName, $modifiedTime, $unqualifiedTableName);
         $this->database->commit();
     }
+
+    abstract function storeALocation(string $spreadsheetId, string $sheetName, string $modifiedTime, string $unqualifiedTableName);
+
+    /**
+     * If the Google Sheet is in the database then update the authorization
+     * confirmed time to now.
+     */
+    abstract function storeAuthorizationConfirmation(string $spreadsheetId);
+
+    /**
+     * The latest modified time in the database
+     *
+     * @see https://tools.ietf.org/html/rfc3339
+     * 
+     * @return ?string the time in RFC3339 format, or null if there are none
+     */
+    abstract function getLatestMotidifedTime(): ?string;
+
+    /**
+     * For all Google Sheets with authorization confirmed on or after the given
+     * date, return the greatest ID
+     * 
+     * @param string $date YYYY-MM-DD format
+     */
+    abstract function getGreatestIdWithAuthorizationCheckedSince(string $date): ?string;
 }

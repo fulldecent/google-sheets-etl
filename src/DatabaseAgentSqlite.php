@@ -32,7 +32,7 @@ SQL;
     /**
      * @param string $date YYYY-MM-DD format
      */
-    function getGreatestIdWithAuthorizationCheckedSince(string $date)
+    function getGreatestIdWithAuthorizationCheckedSince(string $date): ?string
     {
         $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
         $sql = <<<SQL
@@ -102,7 +102,7 @@ SQL;
         }
     }
 
-    function storeAccounting(string $spreadsheetId, string $sheetName, string $modifiedTime, string $unqualifiedTableName)
+    function storeALocation(string $spreadsheetId, string $sheetName, string $modifiedTime, string $unqualifiedTableName)
     {
         $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
         $accountingSql = <<<SQL
@@ -114,6 +114,19 @@ SQL;
         $statement = $this->database->prepare($accountingSql);
         $statement->execute([$spreadsheetId, $sheetName, $unqualifiedTableName, $modifiedTime, $this->loadTime, $this->loadTime]);
     }
+
+    /**
+     * If the Google Sheet is in the database then update the authorization
+     * confirmed time to now.
+     */
+    function storeAuthorizationConfirmation(string $spreadsheetId)
+    {
+        assert(0);
+        //TODO
+    }
+
+
+
 
     /* Private functions ******************************************************/
 

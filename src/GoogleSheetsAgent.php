@@ -30,17 +30,15 @@ class GoogleSheetsAgent
      *
      * @see https://developers.google.com/drive/api/v3/reference/files#list
      * @see https://tools.ietf.org/html/rfc3339
-     * @todo The since is insufficient to resume progress because two files could
-     *       be modified at the same second. Improve this by ordering
-     *       deterministicly by modifiedTime and then id and also have a "since"
-     *       parameter for the id.
+     * @todo Two files could be modified at the same second, so we should
+     *       instead sort/filter by (since, id).
      * 
      * @param string $credentialsFile
      * @param string $since Limit results to modified since then
      * @param int $count Limit number of results
      * @return ?array Array with elements ID -> modifiedTime (RFC 3339 format)
      */
-    function listSomeSpreadsheets(string $since='2001-01-01T12:00:00', int $count=500): ?array
+    function listOldestSpreadsheets(string $since='2001-01-01T12:00:00', int $count=500): ?array
     {
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
@@ -48,7 +46,7 @@ class GoogleSheetsAgent
         
         // Collect file list
         try {
-            echo "TODO: switch this from >= to > after 'do not select a row if one sheet was not loaded'\n";      
+            echo "TODO: Two files could be modified at the same second, so we should instead sort/filter by (since, id).\n";      
             $optParams = [
                 'orderBy' => 'modifiedTime',
                 'pageSize' => $count, # Google default is 100, maximum is 1000
@@ -72,24 +70,6 @@ class GoogleSheetsAgent
             echo json_encode($e->getErrors());
             return null;
         }
-    }
-    
-    /**
-     * Truncate/pad all arrays in row to a given length
-     *
-     * @param array $rows
-     * @param integer $length
-     * @return array array containing arrays each with size LENGTH
-     */
-    private function normalizeArraysToLength(array $rows, int $length): array
-    {
-        $retval = [];
-        foreach ($rows as $row) {
-            $row = array_slice($row, 0, $length);
-            $row = array_pad($row, $length, null);
-            $retval[] = $row;
-        }
-        return $retval;
     }
     
     /**
@@ -147,5 +127,26 @@ class GoogleSheetsAgent
             echo json_encode($e->getErrors());
             die();
         }
+    }
+
+
+    /* Private functions ******************************************************/
+
+    /**
+     * Truncate/pad all arrays in row to a given length
+     *
+     * @param array $rows
+     * @param integer $length
+     * @return array array containing arrays each with size LENGTH
+     */
+    private function normalizeArraysToLength(array $rows, int $length): array
+    {
+        $retval = [];
+        foreach ($rows as $row) {
+            $row = array_slice($row, 0, $length);
+            $row = array_pad($row, $length, null);
+            $retval[] = $row;
+        }
+        return $retval;
     }
 }

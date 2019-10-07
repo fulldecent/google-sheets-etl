@@ -6,8 +6,8 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class Tasks
 {
-    private /* GoogleSheetsAgent */ $googleSheetsAgent;
-    private /* DatabaseAgent */ $databaseAgent;
+    public /* GoogleSheetsAgent */ $googleSheetsAgent;
+    public /* DatabaseAgent */ $databaseAgent;
 
     function __construct(string $credentialsFile, \PDO $database)
     {
@@ -16,79 +16,7 @@ class Tasks
         $this->databaseAgent->setupDatabase();
     }
 
-}
-
-class OTHerCoDe {
-    function setConfiguration(array $newConfiguration)
-    {
-        foreach ($newConfiguration as $newSpreadsheetConfiguration) {
-            $spreadsheetId = $newSpreadsheetConfiguration->spreadsheetId;
-            $sheetTableNames = [];
-            foreach ($newSpreadsheetConfiguration->sheets as $newSheetName => $newSheetTableName) {
-                $sheetTableNames[$newSheetName] = $newSheetTableName;
-            }
-            $this->configuration[$spreadsheetId] = $sheetTableNames;
-        }
-    }
-  
-    /**
-     * Load sheets that have been modified since the most recent modifications in
-     * our database.
-     */
-    public function synchronizeSomeSpreadsheets()
-    {
-        $this->setupDatabaseMySql();
-        $latestModifiedTime = $this->getLatestMotidifedTime();
-        echo '- Prior ETL is syncronized up to: ' . $latestModifiedTime . PHP_EOL;
-        echo '- Accessing Sheets as: ' . $this->getAccountName() . PHP_EOL;
-        echo PHP_EOL . 'LOADING NEW SHEETS' . PHP_EOL;
-        $newerFiles = $this->listSomeSpreadsheets($latestModifiedTime) ?? [];
-        foreach ($newerFiles as $spreadsheetId => $modifiedTime) {
-            echo '  Processing speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
-            $this->loadSpreadsheet($spreadsheetId, $modifiedTime);
-
-/*
-        if (isset($this->configuration[$spreadsheetId][$sheetName])) {
-            $unqualifiedTableName = $this->configuration[$spreadsheetId][$sheetName];
-        }
-*/
-
-        }
-echo "TODO: delete from database sheetsheet ids that are not in the config file\n";
-    }
-
-  /**
-   * Inhale spreadsheet to database, overwriting any existing sheets
-   *
-   * @param string $spreadsheetId Google spreadesheet ID
-   * @param string $modifiedTime RFC 3339 modified time
-   * @return void
-   */
-  function loadSpreadsheet(string $spreadsheetId, string $modifiedTime)
-  {
-    $metaTableName = self::META_TABLE_NAME;
-    $sheetsToLoad = $this->getSheetNames($spreadsheetId);
-
-    // Account for all new sheets in case we are interrupted while loading
-    foreach ($sheetsToLoad as $sheetName) {
-      echo '    Accounting for sheet: ' . $sheetName . PHP_EOL;
-      $accountingSql = <<<SQL
-INSERT IGNORE INTO {$this->schemaString}`{$this->tablePrefix}$metaTableName` (spreadsheet_id, sheet_name, latest_modified_time, latest_authorized_time)
-VALUES (?, ?, ?, ?)
-SQL;
-      $statement = $this->database->prepare($accountingSql);
-      $statement->execute([$spreadsheetId, $sheetName, $modifiedTime, $this->loadTime]);
-    }
-
-    // Actually load the sheets
-    foreach ($sheetsToLoad as $sheetName) {
-      echo '    Processing sheet: ' . $sheetName . PHP_EOL;
-      $this->loadSheet($spreadsheetId, $sheetName, $modifiedTime);
-    }
-
-echo 'TODO: Check accounting and delete accounting+drop tables for sheets that were not loaded, check with latest_authorized_time' . PHP_EOL;
-  }
-  
+TODO, pick up work here
   /**
    * Load one sheet to database
    *
@@ -146,6 +74,86 @@ SQL;
     // Done
     $this->database->commit();
   }
+}
+
+class OTHerCoDe {
+
+
+    /**
+   * Inhale spreadsheet to database, overwriting any existing sheets
+   *
+   * @param string $spreadsheetId Google spreadesheet ID
+   * @param string $modifiedTime RFC 3339 modified time
+   * @return void
+   */
+  function loadSpreadsheet(string $spreadsheetId, string $modifiedTime)
+  {
+    $metaTableName = self::META_TABLE_NAME;
+    $sheetsToLoad = $this->getSheetNames($spreadsheetId);
+
+    // Account for all new sheets in case we are interrupted while loading
+    foreach ($sheetsToLoad as $sheetName) {
+      echo '    Accounting for sheet: ' . $sheetName . PHP_EOL;
+      $accountingSql = <<<SQL
+INSERT IGNORE INTO {$this->schemaString}`{$this->tablePrefix}$metaTableName` (spreadsheet_id, sheet_name, latest_modified_time, latest_authorized_time)
+VALUES (?, ?, ?, ?)
+SQL;
+      $statement = $this->database->prepare($accountingSql);
+      $statement->execute([$spreadsheetId, $sheetName, $modifiedTime, $this->loadTime]);
+    }
+
+    // Actually load the sheets
+    foreach ($sheetsToLoad as $sheetName) {
+      echo '    Processing sheet: ' . $sheetName . PHP_EOL;
+      $this->loadSheet($spreadsheetId, $sheetName, $modifiedTime);
+    }
+
+echo 'TODO: Check accounting and delete accounting+drop tables for sheets that were not loaded, check with latest_authorized_time' . PHP_EOL;
+  }
+
+
+    /**
+     * Load sheets that have been modified since the most recent modifications in
+     * our database.
+     */
+    public function synchronizeSomeSpreadsheets()
+    {
+        $latestModifiedTime = $this->databaseAgent->getLatestMotidifedTime();
+        echo '- Prior ETL is syncronized up to: ' . $latestModifiedTime . PHP_EOL;
+        echo '- Accessing Sheets as: ' . $this->googleSheetsAgent->getAccountName() . PHP_EOL;
+        echo PHP_EOL . 'LOADING NEW SHEETS' . PHP_EOL;
+        $newerFiles = $this->googleSheetsAgent->listSomeSpreadsheets($latestModifiedTime) ?? [];
+        foreach ($newerFiles as $spreadsheetId => $modifiedTime) {
+            echo '  Processing speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
+            $this->loadSpreadsheet($spreadsheetId, $modifiedTime);
+/*
+        if (isset($this->configuration[$spreadsheetId][$sheetName])) {
+            $unqualifiedTableName = $this->configuration[$spreadsheetId][$sheetName];
+        }
+*/
+
+        }
+echo "TODO: delete from database sheetsheet ids that are not in the config file\n";
+    }
+
+
+
+  function setConfiguration(array $newConfiguration)
+    {
+        foreach ($newConfiguration as $newSpreadsheetConfiguration) {
+            $spreadsheetId = $newSpreadsheetConfiguration->spreadsheetId;
+            $sheetTableNames = [];
+            foreach ($newSpreadsheetConfiguration->sheets as $newSheetName => $newSheetTableName) {
+                $sheetTableNames[$newSheetName] = $newSheetTableName;
+            }
+            $this->configuration[$spreadsheetId] = $sheetTableNames;
+        }
+    }
+
+
+
+  
+
   
 
 }

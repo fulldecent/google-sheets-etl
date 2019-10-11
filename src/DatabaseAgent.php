@@ -2,7 +2,42 @@
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A data store and accounting for putting CSV files into a PDO database
+ * A data store and accounting for spreadsheets in a PDO database
+ * 
+ * A spreadsheet contains multiple sheets, each is a row/column data structure.
+ * 
+ * You can imagine accounting is approximately:
+ * 
+ * TABLE spreadsheets
+ *   * __rowid (int)
+ *     * Key
+ *     * Databases require an increasing value to make INSERTs fast
+ *   * spreadsheet_id (string |^[0-9a-z_/-]{44}$|i)
+ *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
+ *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue reported)
+ *     * This regex is an estimate
+ *   * last_modified (string, RFC 3339 date-time)
+ *     * https://developers.google.com/drive/api/v3/reference/files
+ *   * last_authorization_checked (int)
+ *     * Unix timestamp, system time
+ *   * last_loaded (string, RFC 3339 date-time, nullable)
+ *     * Matches last_modified when fully loaded
+ *   * CONSTRAINT spreadsheet_id UNIQUE
+ * 
+ * TABLE sheets
+ *   * __rowid (int)
+ *     * Key
+ *     * Databases require an increasing value to make INSERTs fast
+ *   * spreadsheet_row_id
+ *     * Match above table's key
+ *   * sheet_name (string)
+ *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties
+ *     * The allowable set of sheet names is currently undefined behavior per Google API documentation (issue reported)
+ *   * last_loaded (string, RFC 3339 date-time, nullable)
+ *     * Matches last_modified when loaded
+ *   * table_name (string)
+ *     * Pointer to the table where this sheet is stored in the data store
+ *   * CONSTRAINT spreadsheet_id, sheet_name UNIQUE 
  */
 abstract class DatabaseAgent
 {
@@ -14,6 +49,9 @@ abstract class DatabaseAgent
         switch ($newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
             case 'sqlite':
                 return new DatabaseAgentSqlite($newDatabase);
+                break;
+            case 'mysql':
+                return new DatabaseAgentMysql($newDatabase);
                 break;
             default:
                 echo "Unexpected driver: " . $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
@@ -27,53 +65,91 @@ abstract class DatabaseAgent
         $this->loadTime = date('Y-m-d H:i:s');
     }
 
-    abstract function setupDatabase();
-
-    abstract function createTable(string $unqualifiedTableName, array $columns);
-
-    abstract function insertRows(string $quotedFullyQualifiedTableName, array $rows);
+    // Getters /////////////////////////////////////////////////////////////////
 
     /**
-     * Load one Google Sheets grid sheet into the database
+     * @return string The time this script loaded, in YYYY-MM-DD HH:MM-SS format
+     */
+    abstract function getLoadTime(): string;
+
+    /**
+     * Get table name for a sheet
      * 
-     * @param string $spreadsheetId
-     * @param string $sheetName
-     * @param string $modifiedTime
-     * @param array $columns
-     * @param array $rows
-     * @param string $unqualifiedTableName
+     * @param $spreadsheetId string the spreadsheet ID to query
+     * @param $sheetName string the sheet name to query
+     * @return the table name for the sheet, or null if sheet is not loaded
      */
-    function loadSheet(string $spreadsheetId, string $sheetName, string $modifiedTime, array $columns, array $rows, string $unqualifiedTableName)
-    {
-        $this->database->beginTransaction();
-        $this->createTable($unqualifiedTableName, $columns);
-        $this->insertRows($unqualifiedTableName, $rows);
-        $this->storeALocation($spreadsheetId, $sheetName, $modifiedTime, $unqualifiedTableName);
-        $this->database->commit();
-    }
-
-    abstract function storeALocation(string $spreadsheetId, string $sheetName, string $modifiedTime, string $unqualifiedTableName);
-
+    abstract function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string;
+    
     /**
-     * If the Google Sheet is in the database then update the authorization
-     * confirmed time to now.
-     */
-    abstract function storeAuthorizationConfirmation(string $spreadsheetId);
-
-    /**
-     * The latest modified time in the database
+     * For all spreadsheets which are fully loaded, get the one with the
+     * greatest lexical order of (modified_time, spreadsheet_id), or null if no
+     * spreadsheets are loaded
      *
      * @see https://tools.ietf.org/html/rfc3339
      * 
-     * @return ?string the time in RFC3339 format, or null if there are none
+     * @return array like ['2015-01-01 03:04:05', '349u948k945kd43-k35529_298k938']
      */
-    abstract function getLatestMotidifedTime(): ?string;
+    abstract function getGreatestModifiedAndIdLoaded(): ?array;
 
     /**
-     * For all Google Sheets with authorization confirmed on or after the given
-     * date, return the greatest ID
+     * For all spreadsheets with authorization confirmed on or after the given
+     * date, get the greatest spreadsheet ID
      * 
-     * @param string $date YYYY-MM-DD format
+     * @param string int a Unix timestamp
+     * @return ?string spreadsheet ID or null
      */
-    abstract function getGreatestIdWithAuthorizationCheckedSince(string $date): ?string;
+    abstract function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string;
+
+    /**
+     * Get all spreadsheets which did not have authorization confirmed on or
+     * after the given time
+     * 
+     * @param string int a Unix timestamp
+     * @param int limit a maximum quantity of results to return
+     * @return array spreadsheet IDs in order starting with the least and
+     *               including up to LIMIT number of rows
+     */
+    abstract function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array;
+
+    // Accounting //////////////////////////////////////////////////////////////
+
+    /**
+     * The accounting must be set up before any other methods are called
+     * 
+     * @apiSpec Calling this method twice shall not cause any data loss or any
+     *          error.
+     */
+    abstract function setUpAccounting();
+
+    /**
+     * Account that a spreadsheet is authorized
+     */
+    abstract function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
+    
+    /**
+     * Account that a spreadsheet is fully loaded (after all sheets loaded)
+     */
+    abstract function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified);
+
+    // Data store //////////////////////////////////////////////////////////////
+
+    /**
+     * Removes sheet and accounting, if exists, and load and account for sheet
+     * 
+     * @apiSpec This operation shall be atomic, no partial effect may occur on
+     *          the database if program is prematurely exited.
+     */
+    abstract function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows);
+
+    /**
+     * Removes sheets and accounting for any sheets not loaded since this script
+     * began running
+     */
+    abstract function removeSheetsNotLoadedThisSession(string $spreadsheetId);
+
+    /**
+     * Removes sheets and accounting for giver spreadsheet
+     */
+    abstract function removeSpreadsheet(string $spreadsheetId);
 }

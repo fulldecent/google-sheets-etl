@@ -18,7 +18,7 @@ namespace fulldecent\GoogleSheetsEtl;
  *     * This regex is an estimate
  *   * last_modified (string, RFC 3339 date-time)
  *     * https://developers.google.com/drive/api/v3/reference/files
- *   * last_authorization_checked (int)
+ *   * last_authorization_checked (string YYYY-MM-DD HH:MM:SS)
  *     * Unix timestamp, system time
  *   * last_loaded (string, RFC 3339 date-time, nullable)
  *     * Matches last_modified when fully loaded
@@ -70,7 +70,10 @@ abstract class DatabaseAgent
     /**
      * @return string The time this script loaded, in YYYY-MM-DD HH:MM-SS format
      */
-    abstract function getLoadTime(): string;
+    function getLoadTime(): string
+    {
+        return $this->loadTime;
+    }
 
     /**
      * Get table name for a sheet

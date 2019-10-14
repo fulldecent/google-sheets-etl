@@ -11,3 +11,6 @@ composer.phar
 *.db
 /local
 !/local/README.md
+
+# Ant
+/build

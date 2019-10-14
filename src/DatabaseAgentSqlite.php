@@ -6,16 +6,166 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class DatabaseAgentSqlite extends DatabaseAgent
 {
-    private /* ?string */ $schema;
-    private /* ?string */ $tablePrefix; // Beware of maximum table name length
-    const META_TABLE_NAME = '__meta_table_index';
+    /**
+     * Beware max_allowed_packet errors
+     * @var int
+     */
     public $sqlInsertChunkSize = 500; // Beware max_allowed_packet errors
+
+    /**
+     * Schema prefix, like 'otherdatabase.'
+     * @var ?string
+     */
+    public $schema;
+
+    /**
+     * Prefix for every table name, beware of maximum table name length
+     * @var ?string
+     */
+    public $tablePrefix;
+
+    const SPREADSHEETS_TABLE = '__meta_databases';
+    const SHEETS_TABLE = '__meta_sheets';
+
+    // Accounting //////////////////////////////////////////////////////////////
+
+    /**
+     * The accounting must be set up before any other methods are called
+     * 
+     * @apiSpec Calling this method twice shall not cause any data loss or any
+     *          error.
+     */
+    function setUpAccounting()
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
+
+        $this->database->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
+    -- __rowid INT PRIMARY,
+    spreadsheet_id TEXT,
+    last_modified TEXT, -- Use RFC 3339
+    last_authorization_checked TEXT, -- YYYY-MM-DD HH:MM:SS
+    last_loaded TEXT, -- Use RFC 3339
+    CONSTRAINT spreadsheet_id UNIQUE (spreadsheet_id)
+);
+SQL);
+
+        $this->database->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS $quotedSheetsTable (
+    -- __rowid INT PRIMARY,
+    spreadsheet_row_id INT, -- Match __rowid above
+    sheet_name TEXT,
+    last_loaded TEXT, -- Use RFC 3339
+    table_name TEXT,
+    CONSTRAINT sheet_name UNIQUE (spreadsheet_row_id, sheet_name)
+);
+SQL);
+    }
+
+    /**
+     * Account that a spreadsheet is authorized
+     */
+    function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified)
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+
+        $sql = <<<SQL
+INSERT INTO $quotedSpreadsheetsTable
+(spreadsheet_id, last_modified, last_authorization_checked, last_loaded)
+VALUES
+(:spreadsheet_id, :last_modified, :last_authorization_checked, null)
+ON CONFLICT UPDATE (last_modified=:last_modified, last_authorization_checked=:last_authorization_checked);
+SQL);
+        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheet_id, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
+    }
+    
+    /**
+     * Account that a spreadsheet is fully loaded (after all sheets loaded)
+     */
+    function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified)
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+
+        $sql = <<<SQL
+INSERT INTO $quotedSpreadsheetsTable
+(spreadsheet_id, last_modified, last_authorization_checked, last_loaded)
+VALUES
+(:spreadsheet_id, :last_modified, :last_authorization_checked, :last_modified)
+ON CONFLICT UPDATE (last_modified=:last_modified, last_authorization_checked=:last_authorization_checked, last_loaded=:last_modified);
+SQL);
+        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheet_id, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
+    }
+
+    // Getters /////////////////////////////////////////////////////////////////
+
+    /**
+     * Get table name for a sheet
+     * 
+     * @param $spreadsheetId string the spreadsheet ID to query
+     * @param $sheetName string the sheet name to query
+     * @return the table name for the sheet, or null if sheet is not loaded
+     */
+    function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
+
+        $sql = <<<SQL
+SELECT table_name
+  FROM $quotedSheetsTable sheets
+  JOIN $quotedSpreadsheetsTable spreadsheets
+    ON spreadsheets.__row = sheets.spreadsheet_row_id
+ WHERE sheets.sheet_name = :sheet_name
+   AND spreadsheets.spreadsheet_id = :spreadsheet_id
+SQL);
+        $query = $this->database->prepare($sql);
+        $query->execute(['spreadsheet_id'=>$spreadsheetId, 'sheet_name'=>$sheetName]);
+        $tableName = $query->fetchColumn();
+        return $tableName === false ? null : $tableName;
+    }
+
+
+
+
+    // PRIVATE /////////////////////////////////////////////////////////////////
+
+    /**
+     * Use SCHEMA and PREFIX to generate table name.
+     *
+     * @implNote WARNING, this can make names that are too long for
+     *           the database.
+     *
+     * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
+     *
+     * @param string $unqualifiedName
+     * @return string
+     */
+    private function quotedFullyQualifiedTableName(string $unqualifiedName): string
+    {
+        $qualifiedTableName = ($this->tablePrefix ?? '') . $unqualifiedName;
+        return ($this->schema ?? '') . "`$qualifiedTableName`";
+    }
+
+
+
+
+
+
+
+
+
+
+BELOW HERE IS OLD CODE
+
+
+
 
     /**
      * The latest modified time in the database
      *
      * @see https://tools.ietf.org/html/rfc3339
-     * 
+     *
      * @return ?string The time, or a default value before Google Drive existed
      */
     function getLatestMotidifedTime(): ?string {
@@ -28,7 +178,7 @@ WHERE last_modified = last_loaded
 SQL;
         return $this->database->query($sql)->fetchColumn();
     }
-    
+
     /**
      * @param string $date YYYY-MM-DD format
      */
@@ -44,7 +194,7 @@ SQL;
         $statement->execute([$date]);
         return $statement->fetchColumn();
     }
-    
+
     function setupDatabase()
     {
         $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
@@ -78,7 +228,7 @@ SQL;
         echo $createTableSql . PHP_EOL . PHP_EOL . PHP_EOL;
         $this->database->exec($createTableSql);
     }
-    
+
 
     // Cannot use CSV import with SQLite
     function insertRows(string $unqualifiedTableName, array $rows)
@@ -91,7 +241,7 @@ SQL;
 
         $sqlPrefix = "INSERT INTO $quotedTableName VALUES";
         $sqlOneValueList = implode(',', array_fill(0, count($rows[0]), '?'));
-    
+
         // Load each row for the usable columns
         foreach(array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
             $parameters = array_merge(...$rowChunk);
@@ -131,7 +281,7 @@ SQL;
     /**
      * Turns the columns into unique names of the format which MySQL and SQLite
      * allow as ASCII quoted identifiers
-     * 
+     *
      * @implNote: This will break if a column is named __rowid
      *
      * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
@@ -159,22 +309,6 @@ SQL;
         return $retval;
     }
 
-    /**
-     * Use SCHEMA and PREFIX to generate table name.
-     * 
-     * @implNote WARNING, this make generate names that are too long for
-     *           the database.
-     *
-     * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
-     *
-     * @param string $unqualifiedName
-     * @return string
-     */
-    private function quotedFullyQualifiedTableName(string $unqualifiedName): string
-    {
-        $qualifiedTableName = ($this->tablePrefix ?? '') . $unqualifiedName;
-        return ($this->schema ?? '') . "`$qualifiedTableName`";
-    }
 
     protected function array_key_last(array $array)
     {

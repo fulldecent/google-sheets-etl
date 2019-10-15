@@ -1,14 +1,14 @@
 <?php
 namespace fulldecent\GoogleSheetsEtl;
-
 require_once __DIR__ . '/../vendor/autoload.php';
-
 set_time_limit(300);
+error_reporting(E_ALL);
 
 const CREDENTIALS_FILE = __DIR__ . '/google-shared-team-dashboard-a38a4e97c700.json';
-date_default_timezone_set('UTC'); // Bug in Google libraries
+//date_default_timezone_set('UTC'); // Bug in Google libraries
 
-$database = new \PDO('sqlite:./example-data-mart.db', null, null, [
+$databaseFile = __DIR__ . '/../local/example-data-mart.db';
+$database = new \PDO('sqlite:' . $databaseFile, null, null, [
     \PDO::ATTR_PERSISTENT => false,
     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
 ]);
@@ -18,24 +18,33 @@ $database = new \PDO('sqlite:./example-data-mart.db', null, null, [
 });
 */
 
-# Banner
+## Banner #####################################################################@
 echo 'GOOGLE SHEETS ETL TOOL' . PHP_EOL;
 
-# testing google sheets
-$googleSheetsAgent = new GoogleSheetsAgent(CREDENTIALS_FILE);
-var_dump($googleSheetsTitles->getGridSheetNames('1-Dcs8ZYoyz82rkjkv3tIBSCAJOTpouXor3dwql4TqiY'));
+$serviceAccountConfigurations = glob(__DIR__ . '/../local/*-*.json');
+if (count($serviceAccountConfigurations) !== 1) {
+    echo 'Production service account configuration not found. Skipping test.' . PHP_EOL;
+    exit(0);
+}
 
+$tasks = new Tasks($serviceAccountConfigurations[0], $database);
 
+echo 'Service account: ' . $tasks->googleSheetsAgent->getAccountName() . PHP_EOL;
+echo 'Database: ' . $databaseFile . PHP_EOL;
 
+/*
+$oldestSpreadsheets = $tasks->googleSheetsAgent->getOldestSpreadsheets();
+echo json_encode($oldestSpreadsheets, JSON_PRETTY_PRINT) . PHP_EOL;
 
+$sheetTitles = $tasks->googleSheetsAgent->getGridSheetTitles('1n6BuHFHy_p-Mjv7YtbPDz65SceRvyAwbshy3FAUhvwU');
+echo json_encode($sheetTitles, JSON_PRETTY_PRINT) . PHP_EOL;
 
-//$googleSheetsEtl = new GoogleSheetsEtl(CREDENTIALS_FILE, $database);
-#$googleSheetsEtl->setSchema('etl_google_sheets');
-#$configuration = json_decode(file_get_contents(__DIR__ . '/etl-google-sheets.json'));
-#$googleSheetsEtl->setConfiguration($configuration->spreadsheets);
-//$googleSheetsEtl->synchronizeSomeSpreadsheets();
+$tasks->loadSheet('1n6BuHFHy_p-Mjv7YtbPDz65SceRvyAwbshy3FAUhvwU', 'Sheet1', rfc3339);
+*/
 
+/*
+$spreadsheetId = '1n6BuHFHy_p-Mjv7YtbPDz65SceRvyAwbshy3FAUhvwU';
+$tasks->loadSpreadsheet($spreadsheetId, $modified);
+*/
 
-#$databaseAgent = new DatabaseAgent($database);
-#$databaseAgent->setupDatabaseMySql();
-#$databaseAgent->setupDatabaseSqlite();
+$tasks->loadSomeNewerSpreadsheets();

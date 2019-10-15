@@ -55,11 +55,11 @@ SQL;
         $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS $quotedSheetsTable (
     -- _rowid_ INT PRIMARY,
-    spreadsheet_row_id INT, -- Match _rowid_ above
+    spreadsheet_rowid INT, -- Match _rowid_ above
     sheet_name TEXT,
     last_loaded TEXT, -- Use RFC 3339
     table_name TEXT,
-    CONSTRAINT sheet_name UNIQUE (spreadsheet_row_id, sheet_name)
+    CONSTRAINT sheet_name UNIQUE (spreadsheet_rowid, sheet_name)
 );
 SQL;
         $this->database->exec($sql);
@@ -71,15 +71,20 @@ SQL;
     function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-
         $sql = <<<SQL
-INSERT INTO $quotedSpreadsheetsTable
+INSERT OR IGNORE INTO $quotedSpreadsheetsTable
 (spreadsheet_id, last_modified, last_authorization_checked, last_loaded)
 VALUES
 (:spreadsheet_id, :last_modified, :last_authorization_checked, null)
-ON CONFLICT UPDATE (last_modified=:last_modified, last_authorization_checked=:last_authorization_checked);
 SQL;
-        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheet_id, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
+        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheetId, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
+        $sql = <<<SQL
+UPDATE $quotedSpreadsheetsTable
+   SET last_modified = :last_modified
+     , last_authorization_checked = :last_authorization_checked
+ WHERE spreadsheet_id = :spreadsheet_id
+SQL;
+        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheetId, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
     }
     
     /**
@@ -88,15 +93,21 @@ SQL;
     function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-
         $sql = <<<SQL
-INSERT INTO $quotedSpreadsheetsTable
+INSERT OR IGNORE INTO $quotedSpreadsheetsTable
 (spreadsheet_id, last_modified, last_authorization_checked, last_loaded)
 VALUES
 (:spreadsheet_id, :last_modified, :last_authorization_checked, :last_modified)
-ON CONFLICT UPDATE (last_modified=:last_modified, last_authorization_checked=:last_authorization_checked, last_loaded=:last_modified);
 SQL;
-        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheet_id, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
+        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheetId, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
+        $sql = <<<SQL
+UPDATE $quotedSpreadsheetsTable
+   SET last_modified = :last_modified
+     , last_authorization_checked = :last_authorization_checked
+     , last_loaded = :last_modified
+ WHERE spreadsheet_id = :spreadsheet_id
+SQL;
+        $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheetId, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
     }
 
     // Getters /////////////////////////////////////////////////////////////////
@@ -117,7 +128,7 @@ SQL;
 SELECT table_name
   FROM $quotedSheetsTable sheets
   JOIN $quotedSpreadsheetsTable spreadsheets
-    ON spreadsheets._rowid_ = sheets.spreadsheet_row_id
+    ON spreadsheets._rowid_ = sheets.spreadsheet_rowid
  WHERE sheets.sheet_name = :sheet_name
    AND spreadsheets.spreadsheet_id = :spreadsheet_id
 SQL;
@@ -146,7 +157,7 @@ SELECT last_modified, spreadsheet_id
  ORDER BY last_modified DESC, spreadsheet_id DESC
  LIMIT 1      
 A;
-        $row = $this->database->query($sql)->fetchArray();
+        $row = $this->database->query($sql)->fetch(\PDO::FETCH_NUM);
         return $row === false ? null : $row;
     }
 
@@ -168,7 +179,7 @@ SELECT spreadsheet_id
  LIMIT 1
 AAAA;
         $query = $this->database->prepare($sql);
-        $query->exec([$since]);
+        $query->execute([$since]);
         $result = $query->fetchColumn();
         return $result === false ? null : $result;
     }
@@ -193,7 +204,7 @@ SELECT spreadsheet_id
  LIMIT $limit
 AAAA;
         $query = $this->database->prepare($sql);
-        $query->exec([$since]);
+        $query->execute([$since]);
         return $query->fetchColumn();
     }
 
@@ -207,17 +218,17 @@ AAAA;
      */
     function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows)
     {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
         $this->database->beginTransaction();
 
         // Create table
-        $quotedTableName = $this->quotedFullyQualifiedTableName($unqualifiedTableName);
+        $quotedTableName = $this->quotedFullyQualifiedTableName($tableName);
         $dropTableSql = "DROP TABLE IF EXISTS $quotedTableName";
         $this->database->exec($dropTableSql);
         $quotedColumnArray = $this->normalizedQuotedColumnNames($columns);
         $quotedColumns = implode(',', $quotedColumnArray);
         $createTableSql = "CREATE TABLE $quotedTableName ($quotedColumns)";
-        echo $createTableSql . PHP_EOL . PHP_EOL . PHP_EOL;
         $this->database->exec($createTableSql);
 
         // Insert rows
@@ -236,13 +247,16 @@ AAAA;
 
         // Update accounting
         $accountingSql = <<<AAAA
-REPLACE INTO $quotedSheetsTable (
-    spreadsheet_id, sheet_name, table_name, last_modified, last_loaded, last_authorization_checked
+INSERT OR REPLACE INTO $quotedSheetsTable (
+    spreadsheet_rowid,
+    sheet_name,
+    last_loaded,
+    table_name
 )
-VALUES (?, ?, ?, ?, ?, ?)
+VALUES ((SELECT _rowid_ FROM $quotedSpreadsheetsTable WHERE spreadsheet_id = ?), ?, ?, ?)
 AAAA;
         $statement = $this->database->prepare($accountingSql);
-        $statement->execute([$spreadsheetId, $sheetName, $unqualifiedTableName, $modifiedTime, $modifiedTime, $this->loadTime]);
+        $statement->execute([$spreadsheetId, $sheetName, $modifiedTime, $tableName]);
 
         // All done
         $this->database->commit();
@@ -263,12 +277,12 @@ AAAA;
 SELECT table_name
   FROM $quotedSheetsTable sheets
   JOIN $quotedSpreadsheetsTable spreadsheets
-    ON spreadsheets._rowid_ = sheets.spreadsheet_row_id
+    ON spreadsheets._rowid_ = sheets.spreadsheet_rowid
  WHERE spreadsheet_id = ?
    AND sheets.last_loaded != spreadsheets.last_modified
 AAAA;
         $query = $this->database->prepare($findSheetsSql);
-        $query->exec([$spreadsheetId]);
+        $query->execute([$spreadsheetId]);
 
         // Delete sheet tables
         foreach ($query->fetchAll(\PDO::FETCH_COLUMN) as $unqualifiedTableName) {
@@ -287,13 +301,13 @@ DELETE
        SELECT sheets._rowid_
          FROM $quotedSheetsTable sheets
          JOIN $quotedSpreadsheetsTable spreadsheets
-           ON spreadsheets._rowid_ = sheets.spreadsheet_row_id
+           ON spreadsheets._rowid_ = sheets.spreadsheet_rowid
         WHERE spreadsheet_id = ?
           AND sheets.last_loaded != spreadsheets.last_modified
        )
 AAAA;
         $query = $this->database->prepare($deleteSheets);
-        $this->database->execute([$spreadsheetId]);
+        $query->execute([$spreadsheetId]);
 
         // All done
         $this->database->commit();
@@ -312,14 +326,14 @@ AAAA;
         $findSheetsSql = <<<AAAA
 SELECT table_name
   FROM $quotedSheetsTable
- WHERE spreadsheet_row_id IN (
+ WHERE spreadsheet_rowid IN (
        SELECT _rowid_
          FROM $quotedSpreadsheetsTable
         WHERE spreadsheet_id = ?
        ) 
 AAAA;
         $query = $this->database->prepare($findSheetsSql);
-        $query->exec([$spreadsheetId]);
+        $query->execute([$spreadsheetId]);
 
         // Delete sheet tables
         foreach ($query->fetchAll(\PDO::FETCH_COLUMN) as $unqualifiedTableName) {
@@ -334,7 +348,7 @@ SQL;
         $deleteSheets = <<<AAAA
 DELETE 
   FROM $quotedSheetsTable
- WHERE spreadsheet_row_id IN (
+ WHERE spreadsheet_rowid IN (
        SELECT _rowid_
          FROM $quotedSpreadsheetsTable
         WHERE spreadsheet_id = ?

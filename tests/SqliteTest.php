@@ -18,7 +18,6 @@ class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
         ]);
         $this->databaseAgent = DatabaseAgent::AgentForPDO($this->database);
-        $this->databaseAgent->setUpAccounting();
     }
 
     public function testMetadataTableCreated()

@@ -1,6 +1,7 @@
 <?php
 namespace fulldecent\GoogleSheetsEtl;
 
+/*
 require_once __DIR__ . '/../vendor/autoload.php';
 
 $serviceAccountConfigurations = glob(__DIR__ . '/../local/*-*.json');
@@ -34,3 +35,4 @@ echo "Printing some files the service account can access";
 
 echo "~~ Passed" . PHP_EOL . PHP_EOL;
 
+*/

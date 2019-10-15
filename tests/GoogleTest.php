@@ -1,6 +1,7 @@
 <?php
 namespace fulldecent\GoogleSheetsEtl;
 
+/*
 require_once __DIR__ . '/../vendor/autoload.php';
 
 $serviceAccountConfigurations = glob(__DIR__ . '/../local/*-*.json');
@@ -36,3 +37,4 @@ foreach ($someRecentFiles as $spreadsheetId => $modificationTime) {
 }
 echo "~~ Passed" . PHP_EOL . PHP_EOL;
 
+*/

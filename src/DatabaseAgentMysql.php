@@ -1,8 +1,4 @@
 <?php
-
-TODO
-MYSQL Implementation is incomplete
-
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
@@ -10,6 +6,9 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class DatabaseAgentSqlite extends DatabaseAgent
 {
+// TODO CODE BELOW HERE IS OLD
+
+
     private /* \PDO */ $database;
     private /* ?string */ $schema;
     private /* ?string */ $tablePrefix;

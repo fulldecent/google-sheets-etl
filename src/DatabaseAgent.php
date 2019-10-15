@@ -28,7 +28,7 @@ namespace fulldecent\GoogleSheetsEtl;
  *   * __rowid (int)
  *     * Key
  *     * Databases require an increasing value to make INSERTs fast
- *   * spreadsheet_row_id
+ *   * spreadsheet_rowid
  *     * Match above table's key
  *   * sheet_name (string)
  *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties
@@ -63,6 +63,7 @@ abstract class DatabaseAgent
     {
         $this->database = $newDatabase;
         $this->loadTime = date('Y-m-d H:i:s');
+        $this->setUpAccounting();
     }
 
     // Getters /////////////////////////////////////////////////////////////////
@@ -123,7 +124,7 @@ abstract class DatabaseAgent
      * @apiSpec Calling this method twice shall not cause any data loss or any
      *          error.
      */
-    abstract function setUpAccounting();
+    abstract protected function setUpAccounting();
 
     /**
      * Account that a spreadsheet is authorized

@@ -128,7 +128,9 @@ abstract class DatabaseAgent
     /**
      * Account that a spreadsheet is authorized
      */
-    abstract function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
+//TODO: wtf PHP
+     function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified){}
+//    abstract function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
     
     /**
      * Account that a spreadsheet is fully loaded (after all sheets loaded)
@@ -146,13 +148,13 @@ abstract class DatabaseAgent
     abstract function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows);
 
     /**
-     * Removes sheets and accounting for any sheets not loaded since this script
-     * began running
+     * Removes sheets and accounting for any sheets that do not have the latest
+     * known data loaded
      */
-    abstract function removeSheetsNotLoadedThisSession(string $spreadsheetId);
+    abstract function removeOutdatedSheets(string $spreadsheetId);
 
     /**
-     * Removes sheets and accounting for giver spreadsheet
+     * Removes sheets and accounting for given spreadsheet
      */
     abstract function removeSpreadsheet(string $spreadsheetId);
 }

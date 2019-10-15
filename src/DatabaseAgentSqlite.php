@@ -24,7 +24,7 @@ class DatabaseAgentSqlite extends DatabaseAgent
      */
     public $tablePrefix;
 
-    const SPREADSHEETS_TABLE = '__meta_databases';
+    const SPREADSHEETS_TABLE = '__meta_spreadsheets';
     const SHEETS_TABLE = '__meta_sheets';
 
     // Accounting //////////////////////////////////////////////////////////////
@@ -40,27 +40,29 @@ class DatabaseAgentSqlite extends DatabaseAgent
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
 
-        $this->database->exec(<<<SQL
+        $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
-    -- __rowid INT PRIMARY,
+    -- _rowid_ INT PRIMARY,
     spreadsheet_id TEXT,
     last_modified TEXT, -- Use RFC 3339
     last_authorization_checked TEXT, -- YYYY-MM-DD HH:MM:SS
     last_loaded TEXT, -- Use RFC 3339
     CONSTRAINT spreadsheet_id UNIQUE (spreadsheet_id)
 );
-SQL);
+SQL;
+        $this->database->exec($sql);
 
-        $this->database->exec(<<<SQL
+        $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS $quotedSheetsTable (
-    -- __rowid INT PRIMARY,
-    spreadsheet_row_id INT, -- Match __rowid above
+    -- _rowid_ INT PRIMARY,
+    spreadsheet_row_id INT, -- Match _rowid_ above
     sheet_name TEXT,
     last_loaded TEXT, -- Use RFC 3339
     table_name TEXT,
     CONSTRAINT sheet_name UNIQUE (spreadsheet_row_id, sheet_name)
 );
-SQL);
+SQL;
+        $this->database->exec($sql);
     }
 
     /**
@@ -76,7 +78,7 @@ INSERT INTO $quotedSpreadsheetsTable
 VALUES
 (:spreadsheet_id, :last_modified, :last_authorization_checked, null)
 ON CONFLICT UPDATE (last_modified=:last_modified, last_authorization_checked=:last_authorization_checked);
-SQL);
+SQL;
         $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheet_id, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
     }
     
@@ -93,7 +95,7 @@ INSERT INTO $quotedSpreadsheetsTable
 VALUES
 (:spreadsheet_id, :last_modified, :last_authorization_checked, :last_modified)
 ON CONFLICT UPDATE (last_modified=:last_modified, last_authorization_checked=:last_authorization_checked, last_loaded=:last_modified);
-SQL);
+SQL;
         $this->database->prepare($sql)->execute(['spreadsheet_id'=>$spreadsheet_id, 'last_modified'=>$lastModified, 'last_authorization_checked'=>$this->loadTime]);
     }
 
@@ -115,18 +117,244 @@ SQL);
 SELECT table_name
   FROM $quotedSheetsTable sheets
   JOIN $quotedSpreadsheetsTable spreadsheets
-    ON spreadsheets.__row = sheets.spreadsheet_row_id
+    ON spreadsheets._rowid_ = sheets.spreadsheet_row_id
  WHERE sheets.sheet_name = :sheet_name
    AND spreadsheets.spreadsheet_id = :spreadsheet_id
-SQL);
+SQL;
         $query = $this->database->prepare($sql);
         $query->execute(['spreadsheet_id'=>$spreadsheetId, 'sheet_name'=>$sheetName]);
         $tableName = $query->fetchColumn();
         return $tableName === false ? null : $tableName;
     }
 
+    /**
+     * For all spreadsheets which are fully loaded, get the one with the
+     * greatest lexical order of (modified_time, spreadsheet_id), or null if no
+     * spreadsheets are loaded
+     *
+     * @see https://tools.ietf.org/html/rfc3339
+     * 
+     * @return array like ['2015-01-01 03:04:05', '349u948k945kd43-k35529_298k938']
+     */
+    function getGreatestModifiedAndIdLoaded(): ?array
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $sql = <<<A
+SELECT last_modified, spreadsheet_id
+  FROM $quotedSpreadsheetsTable
+ WHERE last_loaded = last_modified
+ ORDER BY last_modified DESC, spreadsheet_id DESC
+ LIMIT 1      
+A;
+        $row = $this->database->query($sql)->fetchArray();
+        return $row === false ? null : $row;
+    }
 
+    /**
+     * For all spreadsheets with authorization confirmed on or after the given
+     * date, get the greatest spreadsheet ID
+     * 
+     * @param string int a Unix timestamp
+     * @return ?string spreadsheet ID or null
+     */
+    function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $sql = <<<AAAA
+SELECT spreadsheet_id
+  FROM $quotedSpreadsheetsTable
+ WHERE last_authorization_checked >= ?
+ ORDER BY spreadsheet_id DESC
+ LIMIT 1
+AAAA;
+        $query = $this->database->prepare($sql);
+        $query->exec([$since]);
+        $result = $query->fetchColumn();
+        return $result === false ? null : $result;
+    }
 
+    /**
+     * Get all spreadsheets which did not have authorization confirmed on or
+     * after the given time
+     * 
+     * @param string int a Unix timestamp
+     * @param int limit a maximum quantity of results to return
+     * @return array spreadsheet IDs in order starting with the lowest and
+     *               including up to LIMIT number of rows
+     */
+    function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $sql = <<<AAAA
+SELECT spreadsheet_id
+  FROM $quotedSpreadsheetsTable
+ WHERE last_authorization_checked < ?
+ ORDER BY spreadsheet_id
+ LIMIT $limit
+AAAA;
+        $query = $this->database->prepare($sql);
+        $query->exec([$since]);
+        return $query->fetchColumn();
+    }
+
+    // Data store //////////////////////////////////////////////////////////////
+
+    /**
+     * Removes sheet and accounting, if exists, and load and account for sheet
+     * 
+     * @apiSpec This operation shall be atomic, no partial effect may occur on
+     *          the database if program is prematurely exited.
+     */
+    function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows)
+    {
+        $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
+        $this->database->beginTransaction();
+
+        // Create table
+        $quotedTableName = $this->quotedFullyQualifiedTableName($unqualifiedTableName);
+        $dropTableSql = "DROP TABLE IF EXISTS $quotedTableName";
+        $this->database->exec($dropTableSql);
+        $quotedColumnArray = $this->normalizedQuotedColumnNames($columns);
+        $quotedColumns = implode(',', $quotedColumnArray);
+        $createTableSql = "CREATE TABLE $quotedTableName ($quotedColumns)";
+        echo $createTableSql . PHP_EOL . PHP_EOL . PHP_EOL;
+        $this->database->exec($createTableSql);
+
+        // Insert rows
+        if (count($rows) > 0) {
+            $sqlPrefix = "INSERT INTO $quotedTableName VALUES";
+            $sqlOneValueList = implode(',', array_fill(0, count($columns), '?'));
+            // Load each row for the usable columns
+            foreach (array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
+                $parameters = array_merge(...$rowChunk);
+                $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
+                $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
+                $statement->execute($parameters);
+                echo '        loaded ' . ($this->array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
+            }
+        }
+
+        // Update accounting
+        $accountingSql = <<<AAAA
+REPLACE INTO $quotedSheetsTable (
+    spreadsheet_id, sheet_name, table_name, last_modified, last_loaded, last_authorization_checked
+)
+VALUES (?, ?, ?, ?, ?, ?)
+AAAA;
+        $statement = $this->database->prepare($accountingSql);
+        $statement->execute([$spreadsheetId, $sheetName, $unqualifiedTableName, $modifiedTime, $modifiedTime, $this->loadTime]);
+
+        // All done
+        $this->database->commit();
+    }
+
+    /**
+     * Removes sheets and accounting for any sheets that do not have the latest
+     * known data loaded
+     */
+    function removeOutdatedSheets(string $spreadsheetId)
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
+        $this->database->beginTransaction();
+
+        // Find old sheets
+        $findSheetsSql = <<<AAAA
+SELECT table_name
+  FROM $quotedSheetsTable sheets
+  JOIN $quotedSpreadsheetsTable spreadsheets
+    ON spreadsheets._rowid_ = sheets.spreadsheet_row_id
+ WHERE spreadsheet_id = ?
+   AND sheets.last_loaded != spreadsheets.last_modified
+AAAA;
+        $query = $this->database->prepare($findSheetsSql);
+        $query->exec([$spreadsheetId]);
+
+        // Delete sheet tables
+        foreach ($query->fetchAll(\PDO::FETCH_COLUMN) as $unqualifiedTableName) {
+            $tableName = $this->quotedFullyQualifiedTableName($unqualifiedTableName);
+            $dropTableSql = <<<SQL
+DROP TABLE $tableName
+SQL;
+            $this->database->query($dropTableSql);
+        }
+
+        // Delete old sheets accounting
+        $deleteSheets = <<<AAAA
+DELETE 
+  FROM $quotedSheetsTable
+ WHERE _rowid_ IN (
+       SELECT sheets._rowid_
+         FROM $quotedSheetsTable sheets
+         JOIN $quotedSpreadsheetsTable spreadsheets
+           ON spreadsheets._rowid_ = sheets.spreadsheet_row_id
+        WHERE spreadsheet_id = ?
+          AND sheets.last_loaded != spreadsheets.last_modified
+       )
+AAAA;
+        $query = $this->database->prepare($deleteSheets);
+        $this->database->execute([$spreadsheetId]);
+
+        // All done
+        $this->database->commit();
+    }
+
+    /**
+     * Removes sheets and accounting for given spreadsheet
+     */
+    function removeSpreadsheet(string $spreadsheetId)
+    {
+        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
+        $this->database->beginTransaction();
+
+        // Find sheets
+        $findSheetsSql = <<<AAAA
+SELECT table_name
+  FROM $quotedSheetsTable
+ WHERE spreadsheet_row_id IN (
+       SELECT _rowid_
+         FROM $quotedSpreadsheetsTable
+        WHERE spreadsheet_id = ?
+       ) 
+AAAA;
+        $query = $this->database->prepare($findSheetsSql);
+        $query->exec([$spreadsheetId]);
+
+        // Delete sheet tables
+        foreach ($query->fetchAll(\PDO::FETCH_COLUMN) as $unqualifiedTableName) {
+            $tableName = $this->quotedFullyQualifiedTableName($unqualifiedTableName);
+            $dropTableSql = <<<SQL
+DROP TABLE $tableName
+SQL;
+            $this->database->query($dropTableSql);
+        }
+
+        // Delete sheets accounting
+        $deleteSheets = <<<AAAA
+DELETE 
+  FROM $quotedSheetsTable
+ WHERE spreadsheet_row_id IN (
+       SELECT _rowid_
+         FROM $quotedSpreadsheetsTable
+        WHERE spreadsheet_id = ?
+       )
+AAAA;
+        $query = $this->database->prepare($deleteSheets);
+        $this->database->execute([$spreadsheetId]);
+
+        // Delete spreadsheet accounting
+        $deleteSpreadsheet = <<<AAAA
+DELETE 
+  FROM $quotedSpreadsheetsTable
+ WHERE spreadsheet_id = ?
+AAAA;
+        $query = $this->database->prepare($deleteSpreadsheet);
+        $this->database->execute([$spreadsheetId]);
+
+        // All done
+        $this->database->commit();
+    }
 
     // PRIVATE /////////////////////////////////////////////////////////////////
 
@@ -147,142 +375,11 @@ SQL);
         return ($this->schema ?? '') . "`$qualifiedTableName`";
     }
 
-
-
-
-
-
-
-
-
-
-BELOW HERE IS OLD CODE
-
-
-
-
-    /**
-     * The latest modified time in the database
-     *
-     * @see https://tools.ietf.org/html/rfc3339
-     *
-     * @return ?string The time, or a default value before Google Drive existed
-     */
-    function getLatestMotidifedTime(): ?string {
-    echo 'TODO: refactor this so that it get the last spreadsheet that was fully loaded. As current the way this is used it can skip other sheets on reload if one sheet causes a crash' . PHP_EOL;
-        $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
-    $sql = <<<SQL
-SELECT MAX(last_modified)
-FROM $quotedMetaTableName
-WHERE last_modified = last_loaded
-SQL;
-        return $this->database->query($sql)->fetchColumn();
-    }
-
-    /**
-     * @param string $date YYYY-MM-DD format
-     */
-    function getGreatestIdWithAuthorizationCheckedSince(string $date): ?string
-    {
-        $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
-        $sql = <<<SQL
-SELECT MAX(spreadsheet_id)
-FROM $quotedMetaTableName
-WHERE last_authorization_checked >= ?
-SQL;
-        $statement = $this->database->prepare($sql);
-        $statement->execute([$date]);
-        return $statement->fetchColumn();
-    }
-
-    function setupDatabase()
-    {
-        $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
-        $sql = <<<SQL
-CREATE TABLE IF NOT EXISTS $quotedMetaTableName (
-    spreadsheet_id TEXT,
-    sheet_name TEXT,
-    table_name TEXT,
-    last_modified TEXT, -- Use rfc3339
-    last_loaded TEXT,
-    last_authorization_checked TEXT,
-    CONSTRAINT spreadsheet_id UNIQUE (spreadsheet_id,sheet_name)
-)
-SQL;
-        $this->database->exec($sql);
-    }
-
-    /// Creates an empty table, replacing if exists
-    function createTable(string $unqualifiedTableName, array $columns)
-    {
-        $quotedTableName = $this->quotedFullyQualifiedTableName($unqualifiedTableName);
-
-        // Drop table
-        $dropTableSql = "DROP TABLE IF EXISTS $quotedTableName";
-        $this->database->exec($dropTableSql);
-
-        // Create table
-        $quotedColumnArray = $this->normalizedQuotedColumnNames($columns);
-        $quotedColumns = implode(',', $quotedColumnArray);
-        $createTableSql = "CREATE TABLE $quotedTableName ($quotedColumns)";
-        echo $createTableSql . PHP_EOL . PHP_EOL . PHP_EOL;
-        $this->database->exec($createTableSql);
-    }
-
-
-    // Cannot use CSV import with SQLite
-    function insertRows(string $unqualifiedTableName, array $rows)
-    {
-        if (!count($rows)) {
-            return;
-        }
-        $quotedTableName = $this->quotedFullyQualifiedTableName($unqualifiedTableName);
-
-
-        $sqlPrefix = "INSERT INTO $quotedTableName VALUES";
-        $sqlOneValueList = implode(',', array_fill(0, count($rows[0]), '?'));
-
-        // Load each row for the usable columns
-        foreach(array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
-            $parameters = array_merge(...$rowChunk);
-            $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
-            $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
-            $statement->execute($parameters);
-            echo "        loaded " . ($this->array_key_last($rowChunk) + 1) . " rows" . PHP_EOL;
-        }
-    }
-
-    function storeALocation(string $spreadsheetId, string $sheetName, string $modifiedTime, string $unqualifiedTableName)
-    {
-        $quotedMetaTableName = $this->quotedFullyQualifiedTableName(self::META_TABLE_NAME);
-        $accountingSql = <<<SQL
-REPLACE INTO $quotedMetaTableName (
-    spreadsheet_id, sheet_name, table_name, last_modified, last_loaded, last_authorization_checked
-)
-VALUES (?, ?, ?, ?, ?, ?)
-SQL;
-        $statement = $this->database->prepare($accountingSql);
-        $statement->execute([$spreadsheetId, $sheetName, $unqualifiedTableName, $modifiedTime, $this->loadTime, $this->loadTime]);
-    }
-
-    /**
-     * If the Google Sheet is in the database then update the authorization
-     * confirmed time to now.
-     */
-    function storeAuthorizationConfirmation(string $spreadsheetId)
-    {
-        assert(0);
-        //TODO
-    }
-
-
-    /* Private functions ******************************************************/
-
     /**
      * Turns the columns into unique names of the format which MySQL and SQLite
      * allow as ASCII quoted identifiers
      *
-     * @implNote: This will break if a column is named __rowid
+     * @implNote: This will break if a column is named _rowid_
      *
      * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
      * identifiers.
@@ -304,13 +401,12 @@ SQL;
             if (preg_match('/^col_[0-9]+$/', $column) || empty($column) || in_array($column, $retval)) {
                 $column = 'col_' . ($index + 1);
             }
-            $retval[] = '`' . $column . '`';
+            array_push($retval, '`' . $column . '`');
         }
         return $retval;
     }
 
-
-    protected function array_key_last(array $array)
+    private function array_key_last(array $array)
     {
         end($array);
         return key($array);

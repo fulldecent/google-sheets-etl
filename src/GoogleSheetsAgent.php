@@ -49,28 +49,22 @@ class GoogleSheetsAgent
         $this->throttleIfNecessary();
         
         // Collect file list
-        try {
-            $optParams = [
-                'orderBy' => 'modifiedTime',
-                'pageSize' => $count, # Google default is 100, maximum is 1000
-                'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedAfter'",
-                'fields' => 'nextPageToken, files(id,modifiedTime)'
-            ];            
-            $results = $googleService->files->listFiles($optParams);
-            foreach ($results->getFiles() as $file) {
-                if ($file->getModifiedTime() <= $modifiedAfter) {
-                    if ($file->getId() <= $idGreaterThan) {
-                        continue;
-                    }
+        $optParams = [
+            'orderBy' => 'modifiedTime',
+            'pageSize' => $count, # Google default is 100, maximum is 1000
+            'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedAfter'",
+            'fields' => 'nextPageToken, files(id,modifiedTime)'
+        ];            
+        $results = $googleService->files->listFiles($optParams);
+        foreach ($results->getFiles() as $file) {
+            if ($file->getModifiedTime() <= $modifiedAfter) {
+                if ($file->getId() <= $idGreaterThan) {
+                    continue;
                 }
-                $retval[$file->getId()] = $file->getModifiedTime();
             }
-            return $retval;
-        } catch (\Google_Service_Exception $e) {
-            echo 'ERROR GOOGLE SERVICE: ';
-            echo json_encode($e->getErrors());
-            return null;
+            $retval[$file->getId()] = $file->getModifiedTime();
         }
+        return $retval;
     }
     
     /**
@@ -89,23 +83,17 @@ class GoogleSheetsAgent
         $this->throttleIfNecessary();
         
         // Collect file list
-        try {
-            $optParams = [
-                'spreadsheetId' => $spreadsheetId,
-                'fields' => 'sheets(properties(title,sheetType))'
-            ];
-            $response = $googleService->spreadsheets->get($spreadsheetId, $optParams);
-            $retval = [];
-            foreach($response->getSheets() as $sheet) {
-                if ($sheet->getProperties()->getSheetType() != 'GRID') continue;
-                $retval[] = $sheet->getProperties()->getTitle();
-            }
-            return $retval;
-        } catch (\Google_Service_Exception $e) {
-            echo 'ERROR: ';
-            echo json_encode($e->getErrors());
-            die();
+        $optParams = [
+            'spreadsheetId' => $spreadsheetId,
+            'fields' => 'sheets(properties(title,sheetType))'
+        ];
+        $response = $googleService->spreadsheets->get($spreadsheetId, $optParams);
+        $retval = [];
+        foreach($response->getSheets() as $sheet) {
+            if ($sheet->getProperties()->getSheetType() != 'GRID') continue;
+            $retval[] = $sheet->getProperties()->getTitle();
         }
+        return $retval;
     }  
     
     /**
@@ -123,15 +111,8 @@ class GoogleSheetsAgent
         $this->throttleIfNecessary();
         
         // Collect row data from sheet
-        try {
-            $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
-            $sheetRows = $response->getValues();
-            return $sheetRows ?? [];
-        } catch (\Google_Service_Exception $e) {
-            echo 'ERROR: ';
-            echo json_encode($e->getErrors());
-            die();
-        }
+        $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
+        return $response->getValues() ?? [];
     }
 
     /**

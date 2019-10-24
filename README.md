@@ -27,5 +27,5 @@ Next, create a Google Service Account. This requires 20 steps so we made a [a st
 
 ## References
 
-* Composer project layout from https://github.com/JakubOnderka/PHP-Console-Color
+* PHP project layout from https://github.com/thephpleague/skeleton
 * "You should never catch errors to report them" https://phpdelusions.net/pdo#errors

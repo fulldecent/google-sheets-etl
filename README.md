@@ -1,4 +1,9 @@
-[![Build Status](https://travis-ci.com/fulldecent/google-sheets-etl.svg?branch=master)](https://travis-ci.com/fulldecent/google-sheets-etl)
+[![Latest Version on Packagist][https://img.shields.io/packagist/v/fulldecent/google-sheets-etl.svg?style=flat-square]][https://packagist.org/packages/fulldecent/google-sheets-etl]
+[![Software License][https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square]](LICENSE.md)
+[![Build Status][https://img.shields.io/travis/fulldecent/google-sheets-etl/master.svg?style=flat-square]][https://travis-ci.org/fulldecent/google-sheets-etl]
+[![Coverage Status][https://img.shields.io/scrutinizer/coverage/g/fulldecent/google-sheets-etl.svg?style=flat-square]][https://scrutinizer-ci.com/g/fulldecent/google-sheets-etl/code-structure]
+[![Quality Score][https://img.shields.io/scrutinizer/g/fulldecent/google-sheets-etl.svg?style=flat-square]][https://scrutinizer-ci.com/g/fulldecent/google-sheets-etl]
+[![Total Downloads][https://img.shields.io/packagist/dt/fulldecent/google-sheets-etl.svg?style=flat-square]][https://packagist.org/packages/fulldecent/google-sheets-etl]
 
 Google Sheets ETL
 =================

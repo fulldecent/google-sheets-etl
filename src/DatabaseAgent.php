@@ -1,13 +1,16 @@
 <?php
+
+declare(strict_types=1);
+
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
  * A data store and accounting for spreadsheets in a PDO database
- * 
+ *
  * A spreadsheet contains multiple sheets, each is a row/column data structure.
- * 
+ *
  * You can imagine accounting is approximately:
- * 
+ *
  * TABLE spreadsheets
  *   * __rowid (int)
  *     * Key
@@ -23,7 +26,7 @@ namespace fulldecent\GoogleSheetsEtl;
  *   * last_loaded (string, RFC 3339 date-time, nullable)
  *     * Matches last_modified when fully loaded
  *   * CONSTRAINT spreadsheet_id UNIQUE
- * 
+ *
  * TABLE sheets
  *   * __rowid (int)
  *     * Key
@@ -37,14 +40,14 @@ namespace fulldecent\GoogleSheetsEtl;
  *     * Matches last_modified when loaded
  *   * table_name (string)
  *     * Pointer to the table where this sheet is stored in the data store
- *   * CONSTRAINT spreadsheet_id, sheet_name UNIQUE 
+ *   * CONSTRAINT spreadsheet_id, sheet_name UNIQUE
  */
 abstract class DatabaseAgent
 {
     protected /* \PDO */ $database;
     protected /* ?string */ $loadTime;
 
-    static function AgentForPDO(\PDO $newDatabase): DatabaseAgent
+    public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
     {
         switch ($newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
             case 'sqlite':
@@ -71,19 +74,19 @@ abstract class DatabaseAgent
     /**
      * @return string The time this script loaded, in YYYY-MM-DD HH:MM-SS format
      */
-    function getLoadTime(): string
+    public function getLoadTime(): string
     {
         return $this->loadTime;
     }
 
     /**
      * Get table name for a sheet
-     * 
+     *
      * @param $spreadsheetId string the spreadsheet ID to query
      * @param $sheetName string the sheet name to query
      * @return the table name for the sheet, or null if sheet is not loaded
      */
-    abstract function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string;
+    abstract public function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string;
     
     /**
      * For all spreadsheets which are fully loaded, get the one with the
@@ -91,36 +94,36 @@ abstract class DatabaseAgent
      * spreadsheets are loaded
      *
      * @see https://tools.ietf.org/html/rfc3339
-     * 
+     *
      * @return array like ['2015-01-01 03:04:05', '349u948k945kd43-k35529_298k938']
      */
-    abstract function getGreatestModifiedAndIdLoaded(): ?array;
+    abstract public function getGreatestModifiedAndIdLoaded(): ?array;
 
     /**
      * For all spreadsheets with authorization confirmed on or after the given
      * date, get the greatest spreadsheet ID
-     * 
+     *
      * @param string int a Unix timestamp
      * @return ?string spreadsheet ID or null
      */
-    abstract function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string;
+    abstract public function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string;
 
     /**
      * Get all spreadsheets which did not have authorization confirmed on or
      * after the given time
-     * 
+     *
      * @param string int a Unix timestamp
      * @param int limit a maximum quantity of results to return
      * @return array spreadsheet IDs in order starting with the least and
      *               including up to LIMIT number of rows
      */
-    abstract function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array;
+    abstract public function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array;
 
     // Accounting //////////////////////////////////////////////////////////////
 
     /**
      * The accounting must be set up before any other methods are called
-     * 
+     *
      * @apiSpec Calling this method twice shall not cause any data loss or any
      *          error.
      */
@@ -129,33 +132,31 @@ abstract class DatabaseAgent
     /**
      * Account that a spreadsheet is authorized
      */
-//TODO: wtf PHP
-     function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified){}
-//    abstract function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
+    abstract public function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
     
     /**
      * Account that a spreadsheet is fully loaded (after all sheets loaded)
      */
-    abstract function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified);
+    abstract public function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified);
 
     // Data store //////////////////////////////////////////////////////////////
 
     /**
      * Removes sheet and accounting, if exists, and load and account for sheet
-     * 
+     *
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
      */
-    abstract function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows);
+    abstract public function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows);
 
     /**
      * Removes sheets and accounting for any sheets that do not have the latest
      * known data loaded
      */
-    abstract function removeOutdatedSheets(string $spreadsheetId);
+    abstract public function removeOutdatedSheets(string $spreadsheetId);
 
     /**
      * Removes sheets and accounting for given spreadsheet
      */
-    abstract function removeSpreadsheet(string $spreadsheetId);
+    abstract public function removeSpreadsheet(string $spreadsheetId);
 }

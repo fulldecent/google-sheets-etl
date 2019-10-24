@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
@@ -25,13 +28,13 @@ class Tasks
      */
     private /* array */ $configurationForSpreadsheetSheet;
 
-    function __construct(string $credentialsFile, \PDO $database)
+    public function __construct(string $credentialsFile, \PDO $database)
     {
         $this->googleSheetsAgent =  new GoogleSheetsAgent($credentialsFile);
-        $this->databaseAgent = DatabaseAgent::AgentForPDO($database);
+        $this->databaseAgent = DatabaseAgent::agentForPdo($database);
     }
 
-    function setConfiguration(string $configurationFileName)
+    public function setConfiguration(string $configurationFileName)
     {
         $allConfiguration = json_decode(file_get_contents($configurationFileName));
         foreach ($allConfiguration as $spreadsheetId => $spreadsheetConfiguration) {
@@ -52,13 +55,13 @@ class Tasks
      *
      * @implNote: This could reduce the transaction locking time by using a
      *            temporary table to stage incoming data.
-     * 
+     *
      * @param string $spreadsheetId
      * @param string $sheetName
      * @param string $modifiedTime
      * @return void
      */
-    function loadSheet(string $spreadsheetId, string $sheetName, string $modifiedTime)
+    public function loadSheet(string $spreadsheetId, string $sheetName, string $modifiedTime)
     {
         echo '  Loading speadsheetId ' . $spreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
         $configuration = $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName];
@@ -74,14 +77,14 @@ class Tasks
 
     /**
      * Inhale spreadsheet to database, overwriting any existing sheets
-     * 
+     *
      * Prerequesite: have already run accountSpreadsheetAuthorized
      *
      * @param string $spreadsheetId Google spreadesheet ID
      * @param string $modifiedTime RFC 3339 modified time
      * @return void
      */
-    function loadSpreadsheet(string $spreadsheetId, string $modifiedTime)
+    public function loadSpreadsheet(string $spreadsheetId, string $modifiedTime)
     {
         echo 'Loading speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
         /*
@@ -126,9 +129,9 @@ class Tasks
     }
 
     /**
-     * Reviews 
+     * Reviews
      */
-    public function deleteSomeGoneSpreadsheets(string $since=null)
+    public function deleteSomeGoneSpreadsheets(string $since = null)
     {
         assert(0);
         //TODO: implement this

@@ -1,7 +1,8 @@
 <?php
-namespace fulldecent\GoogleSheetsEtl;
 
-require_once __DIR__ . '/../vendor/autoload.php';
+declare(strict_types=1);
+
+namespace fulldecent\GoogleSheetsEtl;
 
 class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
 {
@@ -17,7 +18,7 @@ class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
             \PDO::ATTR_PERSISTENT => false,
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
         ]);
-        $this->databaseAgent = DatabaseAgent::AgentForPDO($this->database);
+        $this->databaseAgent = DatabaseAgent::agentForPdo($this->database);
     }
 
     public function testMetadataTableCreated()
@@ -36,7 +37,7 @@ class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
     public function testAddedData()
     {
         $headers = ['col 1', 'col 2'];
-        $data = [ 
+        $data = [
             ['a', 'b'],
             ['c', 'd']
         ];

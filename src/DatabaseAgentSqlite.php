@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
@@ -24,18 +27,18 @@ class DatabaseAgentSqlite extends DatabaseAgent
      */
     public $tablePrefix;
 
-    const SPREADSHEETS_TABLE = '__meta_spreadsheets';
-    const SHEETS_TABLE = '__meta_sheets';
+    public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
+    public const SHEETS_TABLE = '__meta_sheets';
 
     // Accounting //////////////////////////////////////////////////////////////
 
     /**
      * The accounting must be set up before any other methods are called
-     * 
+     *
      * @apiSpec Calling this method twice shall not cause any data loss or any
      *          error.
      */
-    function setUpAccounting()
+    public function setUpAccounting()
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
@@ -68,7 +71,7 @@ SQL;
     /**
      * Account that a spreadsheet is authorized
      */
-    function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified)
+    public function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<SQL
@@ -90,7 +93,7 @@ SQL;
     /**
      * Account that a spreadsheet is fully loaded (after all sheets loaded)
      */
-    function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified)
+    public function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<SQL
@@ -114,12 +117,12 @@ SQL;
 
     /**
      * Get table name for a sheet
-     * 
+     *
      * @param $spreadsheetId string the spreadsheet ID to query
      * @param $sheetName string the sheet name to query
      * @return the table name for the sheet, or null if sheet is not loaded
      */
-    function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string
+    public function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
@@ -144,10 +147,10 @@ SQL;
      * spreadsheets are loaded
      *
      * @see https://tools.ietf.org/html/rfc3339
-     * 
+     *
      * @return array like ['2015-01-01 03:04:05', '349u948k945kd43-k35529_298k938']
      */
-    function getGreatestModifiedAndIdLoaded(): ?array
+    public function getGreatestModifiedAndIdLoaded(): ?array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<A
@@ -164,11 +167,11 @@ A;
     /**
      * For all spreadsheets with authorization confirmed on or after the given
      * date, get the greatest spreadsheet ID
-     * 
+     *
      * @param string int a Unix timestamp
      * @return ?string spreadsheet ID or null
      */
-    function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string
+    public function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<AAAA
@@ -187,13 +190,13 @@ AAAA;
     /**
      * Get all spreadsheets which did not have authorization confirmed on or
      * after the given time
-     * 
+     *
      * @param string int a Unix timestamp
      * @param int limit a maximum quantity of results to return
      * @return array spreadsheet IDs in order starting with the lowest and
      *               including up to LIMIT number of rows
      */
-    function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array
+    public function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<AAAA
@@ -212,13 +215,13 @@ AAAA;
 
     /**
      * Removes sheet and accounting, if exists, and load and account for sheet
-     * 
+     *
      * @implNote: This could reduce the transaction locking time by using a
      *            temporary table to stage incoming data.
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
      */
-    function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows)
+    public function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
@@ -243,7 +246,7 @@ AAAA;
                 $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
                 $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
                 $statement->execute($parameters);
-                echo '        loaded ' . ($this->array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
+                echo '        loaded ' . ($this->arrayKeyLast($rowChunk) + 1) . ' rows' . PHP_EOL;
             }
         }
 
@@ -268,7 +271,7 @@ AAAA;
      * Removes sheets and accounting for any sheets that do not have the latest
      * known data loaded
      */
-    function removeOutdatedSheets(string $spreadsheetId)
+    public function removeOutdatedSheets(string $spreadsheetId)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
@@ -318,7 +321,7 @@ AAAA;
     /**
      * Removes sheets and accounting for given spreadsheet
      */
-    function removeSpreadsheet(string $spreadsheetId)
+    public function removeSpreadsheet(string $spreadsheetId)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedSheetsTable = $this->quotedFullyQualifiedTableName(self::SHEETS_TABLE);
@@ -422,7 +425,7 @@ AAAA;
         return $retval;
     }
 
-    private function array_key_last(array $array)
+    private function arrayKeyLast(array $array)
     {
         end($array);
         return key($array);

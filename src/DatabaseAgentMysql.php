@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
@@ -124,7 +127,7 @@ SQL;
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
             $statement->execute($parameters);
-            echo "        loaded " . ($this->array_key_last($rowChunk) + 1) . " rows" . PHP_EOL;
+            echo "        loaded " . ($this->arrayKeyLast($rowChunk) + 1) . " rows" . PHP_EOL;
         }
     }
 

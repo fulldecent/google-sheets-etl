@@ -28,6 +28,7 @@ if (count($serviceAccountConfigurations) !== 1) {
 }
 
 $tasks = new Tasks($serviceAccountConfigurations[0], $database);
+$tasks->setConfiguration(__DIR__ . '/../local/config.json');
 
 echo 'Service account: ' . $tasks->googleSheetsAgent->getAccountName() . PHP_EOL;
 echo 'Database: ' . $databaseFile . PHP_EOL;

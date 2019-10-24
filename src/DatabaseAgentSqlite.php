@@ -213,6 +213,8 @@ AAAA;
     /**
      * Removes sheet and accounting, if exists, and load and account for sheet
      * 
+     * @implNote: This could reduce the transaction locking time by using a
+     *            temporary table to stage incoming data.
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
      */

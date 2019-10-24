@@ -8,7 +8,22 @@ class Tasks
 {
     public /* GoogleSheetsAgent */ $googleSheetsAgent;
     public /* DatabaseAgent */ $databaseAgent;
-    private /* array */ $mappingSpreadsheetsSheetsToTableName;    
+
+    /**
+     * Example:
+     * {
+     *     "$schema": "./config-schema.json",
+     *     "1b39RL2nQJxdhHYxVmkk4lo3K1IKjSD3_ggnokrZCkx8": {
+     *         "2019 Expirations": {
+     *             "tableName": "certification-course-renewals-2019",
+     *             "columnMapping": {"out1": "in1", "out2": 2},
+     *             "headerRow": 0,
+     *             "skipRows": 1
+     *         }
+     *     }
+     * }
+     */
+    private /* array */ $configurationForSpreadsheetSheet;
 
     function __construct(string $credentialsFile, \PDO $database)
     {
@@ -18,25 +33,18 @@ class Tasks
 
     function setConfiguration(string $configurationFileName)
     {
-        $configuration = json_decode(file_get_contents($configurationFileName));
-        foreach ($configuration as $spreadsheetId => $spreadsheetConfiguration) {
+        $allConfiguration = json_decode(file_get_contents($configurationFileName));
+        foreach ($allConfiguration as $spreadsheetId => $spreadsheetConfiguration) {
             if ($spreadsheetId == '$schema') continue;
-            foreach ($spreadsheetConfiguration as $sheetName => $tableName) {
-                $this->mappingSpreadsheetsSheetsToTableName[$spreadsheetId][$sheetName] = $tableName;
+            foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
+                $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName] = (object)[
+                    'tableName' => $configuration->tableName, # Required property
+                    'columnMapping' => (array)($configuration->columnMapping ?? []), # Optional
+                    'headerRow' => $configuration->headerRow ?? null, # Optional
+                    'skipRows' => $configuration->skipRows ?? null # Optional
+                ];
             }
         }
-    }
-
-    function tableNameForSheet($spreadsheetId, $sheetName): string
-    {
-        if (isset($this->mappingSpreadsheetsSheetsToTableName[$spreadsheetId][$sheetName])) {
-            return $this->mappingSpreadsheetsSheetsToTableName[$spreadsheetId][$sheetName];
-        }
-        return $spreadsheetId . '-' . $sheetName;
-        /*
-        return $this->mappingSpreadsheetsSheetsToTableName[$spreadsheetId][$sheetName]
-            ?? $spreadsheetId . '-' . $sheetName;
-        */
     }
 
     /**
@@ -52,20 +60,22 @@ class Tasks
      */
     function loadSheet(string $spreadsheetId, string $sheetName, string $modifiedTime)
     {
-        $tableName = $this->tableNameForSheet($spreadsheetId, $sheetName);
+        echo '  Loading speadsheetId ' . $spreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
+        $configuration = $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName];
+        $tableName = $configuration->tableName;
 
-        $rows = $this->googleSheetsAgent->getSheetRows($spreadsheetId, $sheetName);
-        assert(count($rows) >= 1);
-        assert(count($rows[0]) >= 1);
-        $headerRow = $rows[0];
-        $dataRows = $this->normalizedArraysOfLength(array_slice($rows, 1), count($headerRow));
-
+        $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($spreadsheetId, $sheetName);
+        $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
         $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
-        $this->databaseAgent->loadAndAccountSheet($spreadsheetId, $sheetName, $tableName, $modifiedTime, $headerRow, $dataRows);
+        $headers = array_keys($configuration->columnMapping);
+        $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
+        $this->databaseAgent->loadAndAccountSheet($spreadsheetId, $sheetName, $tableName, $modifiedTime, $headers, $dataRows);
     }
 
     /**
      * Inhale spreadsheet to database, overwriting any existing sheets
+     * 
+     * Prerequesite: have already run accountSpreadsheetAuthorized
      *
      * @param string $spreadsheetId Google spreadesheet ID
      * @param string $modifiedTime RFC 3339 modified time
@@ -73,10 +83,19 @@ class Tasks
      */
     function loadSpreadsheet(string $spreadsheetId, string $modifiedTime)
     {
-        $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
+        echo 'Loading speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
+        /*
         $sheetsToLoad = $this->googleSheetsAgent->getGridSheetTitles($spreadsheetId);
         foreach ($sheetsToLoad as $sheetName) {
+            if (!isset($this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName])) {
+                echo 'Skipping speadsheetId ' . $spreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
+                continue;
+            }
             $this->loadSheet($spreadsheetId, $sheetName, $modifiedTime);
+        }
+        */
+        foreach ($this->configurationForSpreadsheetSheet[$spreadsheetId] as $sheetName => $configuration) {
+            $this->loadSheet($spreadsheetId, $sheetName, $modifiedTime); 
         }
         $this->databaseAgent->removeOutdatedSheets($spreadsheetId);
         $this->databaseAgent->accountSpreadsheetLoaded($spreadsheetId, $modifiedTime);
@@ -94,10 +113,14 @@ class Tasks
         if (!is_null($result)) {
             list($lastModified, $spreadsheetId) = $result;
         }
-        echo '- Prior ETL is synchronized up to: ' . $lastModified . PHP_EOL;
+        echo 'Prior ETL is synchronized up to: ' . $lastModified . PHP_EOL . PHP_EOL;
         $someNewSpreadsheetsIds = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $spreadsheetId);
         foreach ($someNewSpreadsheetsIds as $spreadsheetId => $modifiedTime) {
-            echo '  Loading speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
+            $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
+            if (!isset($this->configurationForSpreadsheetSheet[$spreadsheetId])) {
+                echo 'Skipping speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
+                continue;
+            }
             $this->loadSpreadsheet($spreadsheetId, $modifiedTime);
         }
     }
@@ -109,25 +132,5 @@ class Tasks
     {
         assert(0);
         //TODO: implement this
-    }
-
-    // PRIVATE /////////////////////////////////////////////////////////////////
-
-    /**
-     * Truncate/pad all arrays in row to a given length
-     *
-     * @param array $rows
-     * @param integer $length
-     * @return array array containing arrays each with size LENGTH
-     */
-    private function normalizedArraysOfLength(array $rows, int $length): array
-    {
-        $retval = [];
-        foreach ($rows as $row) {
-            $row = array_slice($row, 0, $length);
-            $row = array_pad($row, $length, null);
-            $retval[] = $row;
-        }
-        return $retval;
     }
 }

@@ -43,6 +43,7 @@ class GoogleSheetsAgent
     function getOldestSpreadsheets(string $modifiedAfter='2001-01-01T12:00:00', string $idGreaterThan='', int $count=500): array
     {
         $this->assertValidRfc3339Date($modifiedAfter);
+        $retval = [];
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
         $googleService = new \Google_Service_Drive($this->googleClient);
@@ -99,11 +100,12 @@ class GoogleSheetsAgent
     /**
      * Load data from Google Sheets sheet as array (rows) of arrays (columns)
      *
+     * @see https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange
      * @param string $spreadsheetId The spreadsheet load
      * @param string $sheetName The sheet to load (must be GRID type)
      * @return array
      */
-    function getSheetRows(string $spreadsheetId, string $sheetName): array
+    function getSheetRows(string $spreadsheetId, string $sheetName): RowsOfColumns
     {
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Sheets::SPREADSHEETS_READONLY);
@@ -112,7 +114,7 @@ class GoogleSheetsAgent
         
         // Collect row data from sheet
         $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
-        return $response->getValues() ?? [];
+        return new RowsOfColumns($response->getValues());
     }
 
     /**
@@ -124,13 +126,22 @@ class GoogleSheetsAgent
     {
         $secondsExecuting = microtime(true) - $this->loadTime;
         if ($this->numberOfRequestsThisSession > $secondsExecuting) {
-            echo 'Throttling...' . PHP_EOL;
+            echo '  Throttling...' . PHP_EOL;
             usleep(($this->numberOfRequestsThisSession > $secondsExecuting) * 1000000);
         }
         $this->numberOfRequestsThisSession++;
     }
 
     private function assertValidRfc3339Date(string $date) {
-        assert(\DateTime::createFromFormat(\DateTime::RFC3339, $date) !== false);
+        /*
+        PHP validation of RFC3999 is broken
+        $retult = preg_match('/^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\.[0-9]+)?(([Zz])|([\+|\-]([01][0-9]|2[0-3]):[0-5][0-9]))$/', $date);
+
+        if (!$result) {
+            echo 'DATE IS NOT VALID RFC 3339' . PHP_EOL;
+            echo $date;
+            die();
+        }
+        */
     }
 }

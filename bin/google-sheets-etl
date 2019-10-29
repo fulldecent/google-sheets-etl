@@ -32,6 +32,7 @@ $database = new \PDO($databaseDsn, $databaseUsername, $databasePassword, [
 
 $tasks = new Tasks($googleServiceAccountCredentialFile, $database);
 $tasks->setConfiguration($etlSchemaFile);
+$tasks->databaseAgent->setUpAccounting();
 
 echo 'Service account: ' . $tasks->googleSheetsAgent->getAccountName() . PHP_EOL;
 

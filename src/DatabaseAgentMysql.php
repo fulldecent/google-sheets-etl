@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
 	`last_modified` VARCHAR(99) NOT NULL,
 	`last_authorization_checked` VARCHAR(20) NOT NULL,
 	`last_loaded` VARCHAR(99),
+	UNIQUE KEY `row_id` (`_rowid_`),
 	UNIQUE KEY `spreadsheet_id` (`spreadsheet_id`)
 ) ENGINE=InnoDB;        
 SQL;
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS $quotedSheetsTable (
 	`sheet_name` VARCHAR(99) NOT NULL,
 	`last_loaded` VARCHAR(99),
 	`table_name` VARCHAR(99),
+	UNIQUE KEY `row_id` (`_rowid_`),
 	UNIQUE KEY `sheet_name` (`spreadsheet_rowid`, `sheet_name`)
 ) ENGINE InnoDB;
 SQL;
@@ -141,6 +143,7 @@ SQL;
     public function getGreatestModifiedAndIdLoaded(): ?array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
+        var_dump($quotedSpreadsheetsTable);
         $sql = <<<A
 SELECT last_modified, spreadsheet_id
   FROM $quotedSpreadsheetsTable
@@ -220,8 +223,8 @@ AAAA;
         $dropTableSql = "DROP TABLE IF EXISTS $quotedTableName";
         $this->database->exec($dropTableSql);
         $quotedColumnArray = $this->normalizedQuotedColumnNames($columns);
-        $quotedColumns = implode(',', $quotedColumnArray);
-        $createTableSql = "CREATE TABLE $quotedTableName ($quotedColumns)";
+        $quotedColumns = implode(' VARCHAR(100),', $quotedColumnArray);
+        $createTableSql = "CREATE TABLE $quotedTableName ($quotedColumns VARCHAR(100))";
         $this->database->exec($createTableSql);
 
         // Insert rows
@@ -292,7 +295,7 @@ DELETE
   FROM $quotedSheetsTable
  WHERE _rowid_ IN (
        SELECT sheets._rowid_
-         FROM $quotedSheetsTable sheets
+         FROM (SELECT * FROM $quotedSheetsTable) sheets
          JOIN $quotedSpreadsheetsTable spreadsheets
            ON spreadsheets._rowid_ = sheets.spreadsheet_rowid
         WHERE spreadsheet_id = ?
@@ -343,7 +346,7 @@ DELETE
   FROM $quotedSheetsTable
  WHERE spreadsheet_rowid IN (
        SELECT _rowid_
-         FROM $quotedSpreadsheetsTable
+         FROM (SELECT * FROM $quotedSpreadsheetsTable)
         WHERE spreadsheet_id = ?
        )
 AAAA;
@@ -379,7 +382,9 @@ AAAA;
     private function quotedFullyQualifiedTableName(string $unqualifiedName): string
     {
         $qualifiedTableName = ($this->tablePrefix ?? '') . $unqualifiedName;
-        return ($this->schema ?? '') . "`$qualifiedTableName`";
+        return isset($this->schema)
+            ? $this->schema . ".`$qualifiedTableName`"
+            : "`$qualifiedTableName`";
     }
 
     /**

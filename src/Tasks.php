@@ -43,8 +43,8 @@ class Tasks
                 $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName] = (object)[
                     'tableName' => $configuration->tableName, # Required property
                     'columnMapping' => (array)($configuration->columnMapping), # Optional
-                    'headerRow' => $configuration->headerRow ?? null, # Optional
-                    'skipRows' => $configuration->skipRows ?? null # Optional
+                    'headerRow' => $configuration->headerRow ?? 0, # Optional
+                    'skipRows' => $configuration->skipRows ?? 1 # Optional
                 ];
             }
         }

@@ -78,7 +78,6 @@ abstract class DatabaseAgent
     {
         $this->database = $newDatabase;
         $this->loadTime = date('Y-m-d H:i:s');
-        $this->setUpAccounting();
     }
 
     // Getters /////////////////////////////////////////////////////////////////

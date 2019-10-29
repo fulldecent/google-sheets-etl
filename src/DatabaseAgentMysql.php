@@ -15,18 +15,6 @@ class DatabaseAgentSqlite extends DatabaseAgent
      */
     public $sqlInsertChunkSize = 500; // Beware max_allowed_packet errors
 
-    /**
-     * Schema prefix, like 'otherdatabase.'
-     * @var ?string
-     */
-    public $schema;
-
-    /**
-     * Prefix for every table name, beware of maximum table name length
-     * @var ?string
-     */
-    public $tablePrefix;
-
     public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
     public const SHEETS_TABLE = '__meta_sheets';
 

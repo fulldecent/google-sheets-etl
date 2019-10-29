@@ -44,6 +44,18 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 abstract class DatabaseAgent
 {
+    /**
+     * Schema prefix, like 'otherdatabase.'
+     * @var ?string
+     */
+    public $schema;
+
+    /**
+     * Prefix for every table name, beware of maximum table name length
+     * @var ?string
+     */
+    public $tablePrefix;
+
     protected /* \PDO */ $database;
     protected /* ?string */ $loadTime;
 

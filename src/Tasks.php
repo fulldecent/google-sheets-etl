@@ -42,7 +42,7 @@ class Tasks
             foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
                 $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName] = (object)[
                     'tableName' => $configuration->tableName, # Required property
-                    'columnMapping' => (array)($configuration->columnMapping ?? []), # Optional
+                    'columnMapping' => (array)($configuration->columnMapping), # Optional
                     'headerRow' => $configuration->headerRow ?? null, # Optional
                     'skipRows' => $configuration->skipRows ?? null # Optional
                 ];

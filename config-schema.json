@@ -49,7 +49,7 @@
               }        
             }
           },
-          "required": ["tableName"],
+          "required": ["tableName", "columnMapping"],
           "additionalProperties": false
         }
       }

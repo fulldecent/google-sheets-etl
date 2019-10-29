@@ -7,7 +7,7 @@ namespace fulldecent\GoogleSheetsEtl;
 /**
  * A data store and accounting for putting CSV files into a PDO database
  */
-class DatabaseAgentSqlite extends DatabaseAgent
+class DatabaseAgentMysql extends DatabaseAgent
 {
     /**
      * Beware max_allowed_packet errors

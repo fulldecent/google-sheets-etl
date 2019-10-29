@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace fulldecent\GoogleSheetsEtl;
 
-class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
+class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
 {
     /** @var \PDO */
     private $database;
@@ -23,7 +23,8 @@ class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
 
     public function testMetadataTableCreated()
     {
-        $result = $this->database->query('SELECT COUNT(*) FROM sqlite_master WHERE name ="__meta_spreadsheets"')->fetchColumn();
+        $sql = 'SELECT COUNT(*) FROM sqlite_master WHERE name ="__meta_spreadsheets"';
+        $result = $this->database->query($sql)->fetchColumn();
         $this->assertEquals(1, $result);
     }
 
@@ -32,16 +33,5 @@ class DatabaseAgentSqliteTest extends \PHPUnit_Framework_TestCase
         $spreadsheetId = 'aaaa';
         $result = $this->databaseAgent->getTableNameForSheet($spreadsheetId, 'nonexistantsheet');
         $this->assertEquals(null, $result);
-    }
-
-    public function testAddedData()
-    {
-        $headers = ['col 1', 'col 2'];
-        $data = [
-            ['a', 'b'],
-            ['c', 'd']
-        ];
-        $spreadsheetId = '17azPU9lRfRMzFFbwj4SREN-jbzCalUvUWpDHAYCZ1vs';
-        $sheetName = 'sname';
     }
 }

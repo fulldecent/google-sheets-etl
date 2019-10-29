@@ -18,15 +18,23 @@ Simple library for creating colored console ouput.
 
 See `example.php` how to use this library.
 
-## Setup
+## Install
 
-First set up the project dependencies by installing Composer and running:
+Via Composer
 
 ```sh
 composer install
 ```
 
 Next, create a Google Service Account. This requires 20 steps so we made a [a step-by-step illustrated guide](GOOGLE-SETUP.md).
+
+## Testing
+
+```sh
+composer test
+```
+
+
 
 
 

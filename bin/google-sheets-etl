@@ -9,27 +9,30 @@ require_once __DIR__ . '/../vendor/autoload.php';
 set_time_limit(300);
 error_reporting(E_ALL);
 
-const CREDENTIALS_FILE = __DIR__ . '/google-shared-team-dashboard-a38a4e97c700.json';
+## Banner ######################################################################
+echo 'GOOGLE SHEETS ETL TOOL' . PHP_EOL;
 
-$databaseFile = __DIR__ . '/../local/example-data-mart.db';
-$database = new \PDO('sqlite:' . $databaseFile, null, null, [
+if (!is_array($argv) || count($argv) < 4) {
+    echo 'usage: ' . ($argv[0] ?? 'google-sheets-etl') . ' GOOGLE_KEY_JSON ETL_SCHEMA_JSON DATABASE_DSN [DATABASE_USERNAME [DATABASE_PASS]]' . PHP_EOL;
+    die();
+}
+
+## Program #####################################################################
+
+$googleServiceAccountCredentialFile = $argv[1];
+$etlSchemaFile = $argv[2];
+$databaseDsn = $argv[3];
+$databaseUsername = $argv[4] ?? null;
+$databasePassword = $argv[5] ?? null;
+
+$database = new \PDO($databaseDsn, $databaseUsername, $databasePassword, [
     \PDO::ATTR_PERSISTENT => false,
     \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
 ]);
 
-## Banner ######################################################################
-echo 'GOOGLE SHEETS ETL TOOL' . PHP_EOL;
-
-$serviceAccountConfigurations = glob(__DIR__ . '/../local/*-*.json');
-if (count($serviceAccountConfigurations) !== 1) {
-    echo 'Production service account configuration not found. Skipping test.' . PHP_EOL;
-    exit(0);
-}
-
-$tasks = new Tasks($serviceAccountConfigurations[0], $database);
-$tasks->setConfiguration(__DIR__ . '/../local/config.json');
+$tasks = new Tasks($googleServiceAccountCredentialFile, $database);
+$tasks->setConfiguration($etlSchemaFile);
 
 echo 'Service account: ' . $tasks->googleSheetsAgent->getAccountName() . PHP_EOL;
-echo 'Database: ' . $databaseFile . PHP_EOL;
 
 $tasks->loadSomeNewerSpreadsheets();

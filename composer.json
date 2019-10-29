@@ -1,7 +1,7 @@
 {
     "name": "fulldecent/google-sheets-etl",
     "type": "library",
-    "description": "Synchronize all your Google Sheets to your SQL database.",
+    "description": "Synchronize all your Google Sheets to your SQL database",
     "license": "MIT",
     "authors": [
         {
@@ -19,6 +19,9 @@
     },
     "autoload": {
         "psr-4": {"fulldecent\\GoogleSheetsEtl\\": "src/"}
+    },
+    "autoload-dev": {
+        "psr-4": {"fulldecent\\GoogleSheetsEtl\\": "tests/"}
     },
     "scripts": {
         "test": "phpunit",

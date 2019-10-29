@@ -10,5 +10,5 @@
     <arg value="s" />
 
     <!-- Use the PSR2 Standard-->
-    <rule ref="PSR12" />
+    <rule ref="PSR2" />
 </ruleset>

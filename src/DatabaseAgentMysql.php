@@ -33,24 +33,24 @@ class DatabaseAgentMysql extends DatabaseAgent
 
         $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
-    _rowid_ INT PRIMARY KEY -- InnoDB requires an incrementing primary key
-    spreadsheet_id VARCHAR(44),
-    last_modified VARCHAR(99), -- Use RFC 3339 / TODO: Find correct length
-    last_authorization_checked VARCHAR(20), -- YYYY-MM-DD HH:MM:SS
-    last_loaded VARCHAR(99), -- Use RFC 3339
-    CONSTRAINT spreadsheet_id UNIQUE (spreadsheet_id)
-) ENGINE InnoDB;
+	`_rowid_` INT NOT NULL AUTO_INCREMENT,
+	`spreadsheet_id` VARCHAR(44) NOT NULL,
+	`last_modified` VARCHAR(99) NOT NULL,
+	`last_authorization_checked` VARCHAR(20) NOT NULL,
+	`last_loaded` VARCHAR(99),
+	UNIQUE KEY `spreadsheet_id` (`spreadsheet_id`)
+) ENGINE=InnoDB;        
 SQL;
         $this->database->exec($sql);
 
         $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS $quotedSheetsTable (
-    -- _rowid_ INT PRIMARY,
-    spreadsheet_rowid INT, -- Match _rowid_ above
-    sheet_name TEXT,
-    last_loaded TEXT, -- Use RFC 3339
-    table_name TEXT,
-    CONSTRAINT sheet_name UNIQUE (spreadsheet_rowid, sheet_name)
+	`_rowid_` INT NOT NULL AUTO_INCREMENT,
+	`spreadsheet_rowid` INT NOT NULL,
+	`sheet_name` VARCHAR(99) NOT NULL,
+	`last_loaded` VARCHAR(99),
+	`table_name` VARCHAR(99),
+	UNIQUE KEY `sheet_name` (`spreadsheet_rowid`, `sheet_name`)
 ) ENGINE InnoDB;
 SQL;
         $this->database->exec($sql);

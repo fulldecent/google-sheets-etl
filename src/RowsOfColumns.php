@@ -36,7 +36,7 @@ class RowsOfColumns
             } elseif (is_string($specifier)) {
                 $selector = array_search($specifier, $row, true);
                 if ($selector === false) {
-                    throw new Exception('Column selector name not found');
+                    throw new \Exception('Required column not found: ' . $specifier);
                 }
                 $retval[] = $selector;
             }

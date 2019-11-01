@@ -68,7 +68,11 @@ class Tasks
         $tableName = $configuration->tableName;
 
         $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($spreadsheetId, $sheetName);
-        $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
+        try {
+            $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
+        } catch (\Exception $exception) {
+            throw new \Exception('With spreadsheet ' . $spreadsheetId . "\n" . $exception->getMessage());
+        }
         $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
         $headers = array_keys($configuration->columnMapping);
         $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);

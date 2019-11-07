@@ -8,13 +8,11 @@
 Google Sheets ETL
 =================
 
-Synchronize all your Google Sheets to your SQL database.
-
-TODO: Add money screenshot here...
+Live import all your Google Sheets to your data warehouse
 
 
+<img width="1993" alt="Screen Shot 2019-11-07 at 15 44 33" src="https://user-images.githubusercontent.com/382183/68426182-91f86d00-0175-11ea-8915-3ca3700488bd.png">
 
-Simple library for creating colored console ouput.
 
 See `example.php` how to use this library.
 

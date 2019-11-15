@@ -47,6 +47,8 @@ We have found several problems with using Google Sheets as a database, even thou
 - Cannot enforce a unique column
   - Creating a custom data validation formula is cumbersome and not reliable, plus other collaborators can defeat it
 - Cannot create a sheet-level comment to document the purpose of the whole sheet 
+- Filters cannot be used, because by default they will prevent all other workers from seeking rows that they want
+  - If using another mode "filter views", which is harder to find, it will create hundreds of saved "Filter 1", "Filter 2" ... files.
 
 ## References
 

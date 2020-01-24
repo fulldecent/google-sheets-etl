@@ -37,10 +37,10 @@ composer test
 We have found several problems with using Google Sheets as a database, even though we will continue to use it:
 
 - Cannot restrict editing the first row (headers) to certain people
-  - If you try protecting the cells it will prevent everyone from using filter which is unacceptable
-  - Sometimes the page will load slowly and your collaborators will accidently overwrite the first row, which is default-selected, and it will cause your ETL to error until fixed
+  - If you try protecting the cells it will prevent everyone from using a filter which is unacceptable
+  - Sometimes the page will load slowly and your collaborators will accidentally overwrite the first row, which is default-selected, and it will cause your ETL to error until fixed
 - Cannot restrict that any formatting must apply to the entire column (including new rows)
-  - Inevitably, any conditional formatting you try to setup will apply to a disjoint set of cells throughout your sheet over time
+  - Inevitably, any conditional formatting you try to set up will apply to a disjoint set of cells throughout your sheet over time
 - Cannot restrict that formulas must apply to the entire column (including new rows)
   - Inevitably, over time your calculated "status" column will turn into the text literal "DONE" as people copy-paste-values to new rows
 - Cannot limit people from using formatting in cells (which comes by default when they paste into cells)

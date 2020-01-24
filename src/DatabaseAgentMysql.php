@@ -23,7 +23,7 @@ class DatabaseAgentMysql extends DatabaseAgent
     /**
      * The accounting must be set up before any other methods are called
      *
-     * @apiSpec Calling this method twice shall not cause any data loss or any
+     * @apiSpec Calling this method twice shall not cause any data-loss or any
      *          error.
      */
     public function setUpAccounting()
@@ -59,7 +59,7 @@ SQL;
     }
 
     /**
-     * Account that a spreadsheet is authorized
+     * Account where a spreadsheet is authorized
      */
     public function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified)
     {
@@ -81,7 +81,7 @@ SQL;
     }
     
     /**
-     * Account that a spreadsheet is fully loaded (after all sheets loaded)
+     * Account where a spreadsheet is fully loaded (after all sheets loaded)
      */
     public function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified)
     {
@@ -185,7 +185,7 @@ AAAA;
      * @param string int a Unix timestamp
      * @param int limit a maximum quantity of results to return
      * @return array spreadsheet IDs in order starting with the lowest and
-     *               including up to LIMIT number of rows
+     *              inclduing the LIMIT number of rows
      */
     public function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array
     {
@@ -205,7 +205,7 @@ AAAA;
     // Data store //////////////////////////////////////////////////////////////
 
     /**
-     * Removes sheet and accounting, if exists, and load and account for sheet
+     * Removes sheet and accounting, if it exists, and loads and accounts for sheet
      *
      * @implNote: This could reduce the transaction locking time by using a
      *            temporary table to stage incoming data.
@@ -310,7 +310,7 @@ AAAA;
     }
 
     /**
-     * Removes sheets and accounting for given spreadsheet
+     * Removes sheets and accounting for a given spreadsheet
      */
     public function removeSpreadsheet(string $spreadsheetId)
     {

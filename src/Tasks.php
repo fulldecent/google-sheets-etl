@@ -80,7 +80,7 @@ class Tasks
     }
 
     /**
-     * Inhale spreadsheet to database, overwriting any existing sheets
+     * Inhale spreadsheet to database, overwrite any existing sheets
      *
      * Prerequesite: have already run accountSpreadsheetAuthorized
      *
@@ -110,7 +110,7 @@ class Tasks
 
     /**
      * Load some spreadsheets that were modified right after the latest modified
-     * spreadsheets already in the database.
+     * spreadsheets are already in the database.
      */
     public function loadSomeNewerSpreadsheets()
     {

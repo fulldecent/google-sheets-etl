@@ -39,7 +39,7 @@ namespace fulldecent\GoogleSheetsEtl;
  *   * last_loaded (string, RFC 3339 date-time, nullable)
  *     * Matches last_modified when loaded
  *   * table_name (string)
- *     * Pointer to the table where this sheet is stored in the data store
+ *     * Point to the table where this sheet is stored in the data store
  *   * CONSTRAINT spreadsheet_id, sheet_name UNIQUE
  */
 abstract class DatabaseAgent
@@ -83,7 +83,7 @@ abstract class DatabaseAgent
     // Getters /////////////////////////////////////////////////////////////////
 
     /**
-     * @return string The time this script loaded, in YYYY-MM-DD HH:MM-SS format
+     * @return string The time this script was loaded, in YYYY-MM-DD HH:MM-SS format
      */
     public function getLoadTime(): string
     {
@@ -125,8 +125,7 @@ abstract class DatabaseAgent
      *
      * @param string int a Unix timestamp
      * @param int limit a maximum quantity of results to return
-     * @return array spreadsheet IDs in order starting with the least and
-     *               including up to LIMIT number of rows
+     * @return array spreadsheet IDs in order starting with the least and including the LIMIT number of rows
      */
     abstract public function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array;
 
@@ -135,25 +134,25 @@ abstract class DatabaseAgent
     /**
      * The accounting must be set up before any other methods are called
      *
-     * @apiSpec Calling this method twice shall not cause any data loss or any
+     * @apiSpec Calling this method twice shall not cause any data-loss or any
      *          error.
      */
     abstract protected function setUpAccounting();
 
     /**
-     * Account that a spreadsheet is authorized
+     * Account where a spreadsheet is authorized
      */
     abstract public function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
     
     /**
-     * Account that a spreadsheet is fully loaded (after all sheets loaded)
+     * Account where a spreadsheet is fully loaded (after all sheets loaded)
      */
     abstract public function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified);
 
     // Data store //////////////////////////////////////////////////////////////
 
     /**
-     * Removes sheet and accounting, if exists, and load and account for sheet
+     * Removes sheet and accounting, if it exists, and loads and accounts for sheet
      *
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
@@ -167,7 +166,7 @@ abstract class DatabaseAgent
     abstract public function removeOutdatedSheets(string $spreadsheetId);
 
     /**
-     * Removes sheets and accounting for given spreadsheet
+     * Removes sheets and accounting for a given spreadsheet
      */
     abstract public function removeSpreadsheet(string $spreadsheetId);
 }

@@ -1,13 +1,13 @@
 Google Service Account Setup
 =================
 
-You will create a Google Service Account which you, your employees, or others will share files with. Google Sheets ETL will login to Google as the service account to access those files.
+You will create a Google Service Account which you, your employees, or others will share files with. Google Sheets ETL will log in to Google as the service account to access those files.
 
 ## Create a Google account
 
 Use your Gmail account or corporate account.
 
-## Create Cloud Platform project
+## Create a Cloud Platform project
 
 Start at https://console.cloud.google.com/
 

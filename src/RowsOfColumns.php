@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A structure which hold an array (rows) of arrays (columns) containing data.
+ * A structure which holds an array (rows) of arrays (columns) containing data.
  *
  * Empty trailing rows and columns will not be included.
  * @reference https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange
@@ -47,7 +47,7 @@ class RowsOfColumns
     /**
      * Return a two-dimensional array of values
      *
-     * @param  $columnSelectors array specifyies which columns (zero-indexed) to
+     * @param  $columnSelectors array specifies which columns (zero-indexed) to
      *                                extract from each row of source data
      * @param  $skipRows        int   number of rows to skip from source data
      * @return array rows, each containing an array (columns) of values

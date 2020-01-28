@@ -219,23 +219,45 @@ AAAA;
         $this->database->beginTransaction();
 
         // Create table
+//        echo '    Dropping table ' . $tableName;
+//        $quotedTableName = $this->quotedFullyQualifiedTableName($tableName);
+//        $dropTableSql = "DROP TABLE IF EXISTS $quotedTableName";
+//        $this->database->exec($dropTableSql);
+
+        echo '    Creating table';
         $quotedTableName = $this->quotedFullyQualifiedTableName($tableName);
-        $dropTableSql = "DROP TABLE IF EXISTS $quotedTableName";
-        $this->database->exec($dropTableSql);
         $quotedColumnArray = $this->normalizedQuotedColumnNames($columns);
-        $quotedColumns = implode(' VARCHAR(100),', $quotedColumnArray);
-        $createTableSql = "CREATE TABLE $quotedTableName ($quotedColumns VARCHAR(100))";
+        $createTableSql = "CREATE TABLE IF NOT EXISTS $quotedTableName (`_row` int(11) unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY)";
         $this->database->exec($createTableSql);
 
-        // Insert rows
+        echo '    Adding columns';
+        foreach ($this->normalizedQuotedColumnNames($columns) as $normalizedQuotedColumnName) {
+            $addColumnSql = "ALTER TABLE $quotedTableName ADD COLUMN ($normalizedQuotedColumnName VARCHAR(100))";
+            try {
+                $this->database->exec($addColumnSql);
+            } catch (\PDOException $e) {
+                // Ignore if column already exists
+            }
+        }
+
+        echo '    Deleting rows';
+        $quotedTableName = $this->quotedFullyQualifiedTableName($tableName);
+        $deleteSql = "DELETE FROM $quotedTableName";
+        $this->database->exec($deleteSql);
+
+        echo '    Inserting rows';
+        $quotedColumns = implode(',', $quotedColumnArray);
         if (count($rows) > 0) {
-            $sqlPrefix = "INSERT INTO $quotedTableName VALUES";
+            $sqlPrefix = "INSERT INTO $quotedTableName ($quotedColumns) VALUES";
             $sqlOneValueList = implode(',', array_fill(0, count($columns), '?'));
             // Load each row for the usable columns
             foreach (array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
                 $parameters = array_merge(...$rowChunk);
                 $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
                 $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
+                $parameters = array_map(function($v){
+                    return empty($v) ? null : substr($v, 0, 100);
+                }, $parameters);
                 $statement->execute($parameters);
                 echo '        loaded ' . ($this->arrayKeyLast($rowChunk) + 1) . ' rows' . PHP_EOL;
             }

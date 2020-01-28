@@ -67,15 +67,20 @@ class Tasks
         $configuration = $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName];
         $tableName = $configuration->tableName;
 
+        echo '    Getting sheet rows';
         $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($spreadsheetId, $sheetName);
+        echo '    Getting selectors';
         try {
             $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
         } catch (\Exception $exception) {
+            echo '   ERROR: ' . $exception->getMessage();
             throw new \Exception('With spreadsheet ' . $spreadsheetId . "\n" . $exception->getMessage());
         }
+        echo '     Marking authorized';
         $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
         $headers = array_keys($configuration->columnMapping);
         $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
+        echo '     Loading';
         $this->databaseAgent->loadAndAccountSheet($spreadsheetId, $sheetName, $tableName, $modifiedTime, $headers, $dataRows);
     }
 

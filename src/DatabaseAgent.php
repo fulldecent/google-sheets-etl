@@ -59,7 +59,7 @@ abstract class DatabaseAgent
     protected /* \PDO */ $database;
     protected /* ?string */ $loadTime;
 
-    public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
+    final public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
     {
         switch ($newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
             case 'sqlite':

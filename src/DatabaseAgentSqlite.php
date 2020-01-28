@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS $quotedTargetTable (
     _origin_row INT NOT NULL,
     CONSTRAINT _origin_row UNIQUE (_origin_etl_job_id, _origin_row),
     FOREIGN KEY (_origin_etl_job_id)
-        REFERENCES $quotedSpreadsheetsTable(id)
+        REFERENCES $quotedEtlJobsTable(id)
         ON DELETE RESTRICT
         ON UPDATE RESTRICT
 );

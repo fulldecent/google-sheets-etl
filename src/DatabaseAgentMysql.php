@@ -215,10 +215,10 @@ CREATE TABLE IF NOT EXISTS $quotedTargetTable (
     _rowid INT NOT NULL AUTO_INCREMENT,
     _origin_etl_job_id INT NOT NULL,
     _origin_row INT NOT NULL,
-    PRIMARY KEY (id),
+    PRIMARY KEY (_rowid),
     UNIQUE KEY _origin_row (_origin_etl_job_id, _origin_row),
     FOREIGN KEY (_origin_etl_job_id)
-        REFERENCES $quotedSpreadsheetsTable(id)
+        REFERENCES $quotedEtlJobsTable(id)
         ON DELETE RESTRICT
         ON UPDATE RESTRICT
 ) ENGINE=InnoDB;
@@ -235,7 +235,7 @@ SQL;
 
         // Update accounting ///////////////////////////////////////////////////
         $insertAccountingSql = <<<SQL
-INSERT OR IGNORE INTO $quotedEtlJobsTable (
+INSERT IGNORE INTO $quotedEtlJobsTable (
            spreadsheet_id,
            sheet_name,
            target_table,
@@ -257,7 +257,6 @@ UPDATE $quotedEtlJobsTable
      , google_modified = :google_modified
  WHERE spreadsheet_id = (SELECT id FROM $quotedSpreadsheetsTable WHERE google_spreadsheet_id = :google_spreadsheet_id)
    AND sheet_name = :sheet_name
-) 
 SQL;
         $this->database->prepare($updateAccountingSql)->execute([
             'google_spreadsheet_id' => $googleSpreadsheetId,

@@ -30,7 +30,7 @@ class GoogleSheetsAgent
     }
     
     /**
-     * List Google Sheets files chronological by last modified date
+     * List Google Sheets files chronologically by last modified date
      *
      * Files are returned if their (modification time, ID) tuple is lexically
      * greater than or equal to the given modification time and ID.
@@ -72,7 +72,7 @@ class GoogleSheetsAgent
     }
     
     /**
-     * Return all sheets of type GRID in a Google Spreadsheet
+     * Return all sheets of type GRID into a Google Spreadsheet
      *
      * @param string $spreadsheetId which spreadsheet to load
      *
@@ -104,7 +104,7 @@ class GoogleSheetsAgent
     }
     
     /**
-     * Load data from Google Sheets sheet as array (rows) of arrays (columns)
+     * Load data from Google Sheets sheet as an array (rows) of arrays (columns)
      *
      * @param string $spreadsheetId  the spreadsheet load
      * @param string $sheetName      the sheet to load (must be GRID type)

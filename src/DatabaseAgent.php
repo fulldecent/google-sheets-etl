@@ -86,7 +86,7 @@ abstract class DatabaseAgent
     // Getters /////////////////////////////////////////////////////////////////
 
     /**
-     * @return int The time this script loaded, in YYYY-MM-DD HH:MM-SS format
+     * @return int The time this script loaded
      */
     final public function getLoadTime(): int
     {
@@ -149,7 +149,7 @@ abstract class DatabaseAgent
     // Data store //////////////////////////////////////////////////////////////
 
     /**
-     * Removes sheet and accounting, if exists, and load and account for sheet
+     * Removes sheet and accounting, if it exists, and loads and accounts for sheet
      *
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.

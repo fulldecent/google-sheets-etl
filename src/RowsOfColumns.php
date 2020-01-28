@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A structure which hold an array (rows) of arrays (columns) containing data.
+ * A structure which holds an array (rows) of arrays (columns) containing data.
  *
  * Empty trailing rows and columns will not be included.
  * @reference https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange

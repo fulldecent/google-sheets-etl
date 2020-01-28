@@ -193,7 +193,7 @@ SQL;
     // Data store //////////////////////////////////////////////////////////////
 
     /**
-     * Removes sheet and accounting, if exists, and load and account for sheet
+     * Removes sheet and accounting, if it exists, and loads and accounts for sheet
      *
      * @implNote: This could reduce the transaction locking time by using a
      *            temporary table to stage incoming data.

@@ -22,9 +22,9 @@ class RowsOfColumns
     /**
      * Gets column selectors for the specified names from a header row
      *
-     * @param  $specifiers array indicies (zero-indexed) or names of columns
-     * @param  $headerRow  int   which row (zero-indexed) to retrieve from
-     * @return array list of the columns (zero-indexed) for each name specified
+     * @param array   $specifiers  indicies (zero-indexed) or names of columns
+     * @param integer $headerRow   which row (zero-indexed) to retrieve from
+     * @return array               columns (zero-indexed) for names specified
      */
     function getColumnSelectorsFromHeaderRow(array $specifiers, int $headerRow = 0): array
     {
@@ -47,10 +47,11 @@ class RowsOfColumns
     /**
      * Return a two-dimensional array of values
      *
-     * @param  $columnSelectors array specifyies which columns (zero-indexed) to
-     *                                extract from each row of source data
-     * @param  $skipRows        int   number of rows to skip from source data
-     * @return array rows, each containing an array (columns) of values
+     * @param array   $columnSelectors  specifyies which columns (zero-indexed)
+     *                                  to extract from each row of source data
+     * @param integer $skipRows         number of rows to skip from source data
+     * @return array                    rows, each containing an array (columns)
+     *                                  of values
      */
     function getRows(array $columnSelectors, int $skipRows = 1): array
     {

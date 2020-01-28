@@ -33,18 +33,18 @@ class GoogleSheetsAgent
      * List Google Sheets files chronological by last modified date
      *
      * Files are returned if their (modification time, ID) tuple is lexically
-     * greater than the giver modification time and ID.
+     * greater than or equal to the given modification time and ID.
      *
-     * @param string $modifiedAfter limit for files to search
-     * @param string $idGreaterThan limit for files to search
-     * @param int    $count         limit number of results
+     * @param string $modifiedTime limit for files to search
+     * @param string $id           limit for files to search
+     * @param int    $count        limit number of results
      *
-     * @return ?array Array with elements ID -> modifiedTime (RFC 3339 format)
+     * @return array Array with elements ID -> modifiedTime (RFC 3339 format)
      *
      * @see https://developers.google.com/drive/api/v3/reference/files#list
      * @see https://tools.ietf.org/html/rfc3339
      */
-    public function getOldestSpreadsheets(string $modifiedAfter = '2001-01-01T12:00:00', string $idGreaterThan = '', int $count = 500): array
+    public function getOldestSpreadsheets(string $modifiedTime = '2001-01-01T12:00:00', string $id = '', int $count = 500): array
     {
         $retval = [];
         // Initialize client
@@ -56,13 +56,13 @@ class GoogleSheetsAgent
         $optParams = [
             'orderBy' => 'modifiedTime',
             'pageSize' => $count, // Google default is 100, maximum is 1000
-            'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedAfter'",
+            'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedTime'",
             'fields' => 'nextPageToken, files(id,modifiedTime)'
         ];
         $results = $googleService->files->listFiles($optParams);
         foreach ($results->getFiles() as $file) {
-            if ($file->getModifiedTime() <= $modifiedAfter) {
-                if ($file->getId() <= $idGreaterThan) {
+            if ($file->getModifiedTime() <= $modifiedTime) {
+                if ($file->getId() < $id) {
                     continue;
                 }
             }
@@ -106,10 +106,9 @@ class GoogleSheetsAgent
     /**
      * Load data from Google Sheets sheet as array (rows) of arrays (columns)
      *
-     * @param string $spreadsheetId the spreadsheet load
-     * @param string $sheetName     the sheet to load (must be GRID type)
-     *
-     * @return array
+     * @param string $spreadsheetId  the spreadsheet load
+     * @param string $sheetName      the sheet to load (must be GRID type)
+     * @return RowsOfColumns
      *
      * @see https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange
      */

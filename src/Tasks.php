@@ -18,7 +18,7 @@ class Tasks
      *     "$schema": "./config-schema.json",
      *     "1b39RL2nQJxdhHYxVmkk4lo3K1IKjSD3_ggnokrZCkx8": {
      *         "2019 Expirations": {
-     *             "tableName": "certification-course-renewals-2019",
+     *             "targetTable": "certification-course-renewals-2019",
      *             "columnMapping": {"out1": "in1", "out2": 2},
      *             "headerRow": 0,
      *             "skipRows": 1
@@ -34,14 +34,13 @@ class Tasks
         $this->databaseAgent = DatabaseAgent::agentForPdo($database);
     }
 
-    public function setConfiguration(string $configurationFileName)
+    public function setConfiguration(\stdClass $configuration)
     {
-        $allConfiguration = json_decode(file_get_contents($configurationFileName));
-        foreach ($allConfiguration as $spreadsheetId => $spreadsheetConfiguration) {
-            if ($spreadsheetId == '$schema') continue;
+        foreach ($configuration as $googleSpreadsheetId => $spreadsheetConfiguration) {
+            if ($googleSpreadsheetId == '$schema') continue;
             foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
-                $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName] = (object)[
-                    'tableName' => $configuration->tableName, # Required property
+                $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName] = (object)[
+                    'targetTable' => $configuration->targetTable, # Required property
                     'columnMapping' => (array)($configuration->columnMapping), # Optional
                     'headerRow' => $configuration->headerRow ?? 0, # Optional
                     'skipRows' => $configuration->skipRows ?? 1 # Optional
@@ -56,93 +55,85 @@ class Tasks
      * @implNote: This could reduce the transaction locking time by using a
      *            temporary table to stage incoming data.
      *
-     * @param string $spreadsheetId
+     * @param string $googleSpreadsheetId
      * @param string $sheetName
-     * @param string $modifiedTime
+     * @param string $googleModified
      * @return void
      */
-    public function loadSheet(string $spreadsheetId, string $sheetName, string $modifiedTime)
+    public function loadSheet(string $googleSpreadsheetId, string $sheetName, string $googleModified)
     {
-        echo '  Loading speadsheetId ' . $spreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
-        $configuration = $this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName];
-        $tableName = $configuration->tableName;
+        echo '  Loading speadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
+        $configuration = $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName];
+        $targetTable = $configuration->targetTable;
 
         echo '    Getting sheet rows';
-        $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($spreadsheetId, $sheetName);
-        echo '    Getting selectors';
+        $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($googleSpreadsheetId, $sheetName);
+        echo '    Selecting columns';
         try {
             $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
         } catch (\Exception $exception) {
             echo '   ERROR: ' . $exception->getMessage();
-            throw new \Exception('With spreadsheet ' . $spreadsheetId . "\n" . $exception->getMessage());
+            throw new \Exception('With spreadsheet ' . $googleSpreadsheetId . "\n" . $exception->getMessage());
         }
-        echo '     Marking authorized';
-        $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
+        echo '     Loading';
         $headers = array_keys($configuration->columnMapping);
         $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
-        echo '     Loading';
-        $this->databaseAgent->loadAndAccountSheet($spreadsheetId, $sheetName, $tableName, $modifiedTime, $headers, $dataRows);
+        $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified);
+        $this->databaseAgent->loadAndAccountSheet($googleSpreadsheetId, $sheetName, $targetTable, $googleModified, $headers, $dataRows);
     }
 
     /**
-     * Inhale spreadsheet to database, overwriting any existing sheets
+     * Inhale new sheets from spreadsheet to database, overwriting any existing
+     * loaded data
      *
-     * Prerequesite: have already run accountSpreadsheetAuthorized
+     * Prerequisite: have already run accountSpreadsheetSeen
      *
-     * @param string $spreadsheetId Google spreadesheet ID
-     * @param string $modifiedTime RFC 3339 modified time
+     * @param string $googleSpreadsheetId Google spreadesheet ID
+     * @param string $googleModified RFC 3339 modified time
      * @return void
      */
-    public function loadSpreadsheet(string $spreadsheetId, string $modifiedTime)
+    public function loadSpreadsheet(string $googleSpreadsheetId, string $googleModified)
     {
-        echo 'Loading speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
+        echo 'Loading speadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
         /*
-        $sheetsToLoad = $this->googleSheetsAgent->getGridSheetTitles($spreadsheetId);
+        $sheetsToLoad = $this->googleSheetsAgent->getGridSheetTitles($googleSpreadsheetId);
         foreach ($sheetsToLoad as $sheetName) {
-            if (!isset($this->configurationForSpreadsheetSheet[$spreadsheetId][$sheetName])) {
-                echo 'Skipping speadsheetId ' . $spreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
+            if (!isset($this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName])) {
+                echo 'Skipping speadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
                 continue;
             }
-            $this->loadSheet($spreadsheetId, $sheetName, $modifiedTime);
+            $this->loadSheet($googleSpreadsheetId, $sheetName, $googleModified);
         }
         */
-        foreach ($this->configurationForSpreadsheetSheet[$spreadsheetId] as $sheetName => $configuration) {
-            $this->loadSheet($spreadsheetId, $sheetName, $modifiedTime); 
+        foreach ($this->configurationForSpreadsheetSheet[$googleSpreadsheetId] as $sheetName => $configuration) {
+            $etlJob = $this->databaseAgent->getEtl($googleSpreadsheetId, $sheetName);
+            if (!is_null($etlJob) && $etlJob->loaded_google_modified === $etlJob->latest_google_modified) {
+                continue; // Skip, already loaded this sheet version
+            }
+            $this->loadSheet($googleSpreadsheetId, $sheetName, $googleModified); 
         }
-        $this->databaseAgent->removeOutdatedSheets($spreadsheetId);
-        $this->databaseAgent->accountSpreadsheetLoaded($spreadsheetId, $modifiedTime);
     }
 
     /**
-     * Load some spreadsheets that were modified right after the latest modified
-     * spreadsheets already in the database.
+     * Load some spreadsheets that were not completely loaded already
      */
     public function loadSomeNewerSpreadsheets()
     {
         $lastModified = '2001-01-01T00:00:00Z'; // Before Google Drive started
-        $spreadsheetId = ''; // The lexically lowest spreadsheet ID
+        $googleSpreadsheetId = ''; // The lexically lowest spreadsheet ID
         $result = $this->databaseAgent->getGreatestModifiedAndIdLoaded();
         if (!is_null($result)) {
-            list($lastModified, $spreadsheetId) = $result;
+            list($lastModified, $googleSpreadsheetId) = $result;
         }
         echo 'Prior ETL is synchronized up to: ' . $lastModified . PHP_EOL . PHP_EOL;
-        $someNewSpreadsheetsIds = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $spreadsheetId);
-        foreach ($someNewSpreadsheetsIds as $spreadsheetId => $modifiedTime) {
-            $this->databaseAgent->accountSpreadsheetAuthorized($spreadsheetId, $modifiedTime);
-            if (!isset($this->configurationForSpreadsheetSheet[$spreadsheetId])) {
-                echo 'Skipping speadsheetId ' . $spreadsheetId . ' modified ' . $modifiedTime . PHP_EOL;
+        $someNewSpreadsheetsIds = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $googleSpreadsheetId);
+        foreach ($someNewSpreadsheetsIds as $googleSpreadsheetId => $googleModified) {
+            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified);
+            if (!isset($this->configurationForSpreadsheetSheet[$googleSpreadsheetId])) {
+                echo 'Skipping speadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
                 continue;
             }
-            $this->loadSpreadsheet($spreadsheetId, $modifiedTime);
+            $this->loadSpreadsheet($googleSpreadsheetId, $googleModified);
         }
-    }
-
-    /**
-     * Reviews
-     */
-    public function deleteSomeGoneSpreadsheets(string $since = null)
-    {
-        assert(0);
-        //TODO: implement this
     }
 }

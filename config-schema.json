@@ -24,7 +24,7 @@
           "pattern": "^[a-zA-Z0-9_-]+$",
           "title": "The table name to load this sheet as",
           "properties": {
-            "tableName": {
+            "targetTable": {
               "type": "string"
             },
             "headerRow": {
@@ -49,7 +49,7 @@
               }        
             }
           },
-          "required": ["tableName", "columnMapping"],
+          "required": ["targetTable", "columnMapping"],
           "additionalProperties": false
         }
       }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace fulldecent\GoogleSheetsEtl;
 
+use stdClass;
+
 /**
  * A data store and accounting for spreadsheets in a PDO database
  *
@@ -12,40 +14,43 @@ namespace fulldecent\GoogleSheetsEtl;
  * You can imagine accounting is approximately:
  *
  * TABLE spreadsheets
- *   * __rowid (int)
+ *   * id (int) PRIMARY KEY
  *     * Key
  *     * Databases require an increasing value to make INSERTs fast
- *   * spreadsheet_id (string |^[0-9a-z_/-]{44}$|i)
+ *   * google_spreadsheet_id (string |^[0-9a-zA-Z_/-]{44}$|i) (UNIQUE)
  *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
  *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue reported)
  *     * This regex is an estimate
- *   * last_modified (string, RFC 3339 date-time)
+ *   * google_modified (string, RFC 3339 date-time)
  *     * https://developers.google.com/drive/api/v3/reference/files
- *   * last_authorization_checked (string YYYY-MM-DD HH:MM:SS)
+ *   * last_seen (int)
  *     * Unix timestamp, system time
- *   * last_loaded (string, RFC 3339 date-time, nullable)
- *     * Matches last_modified when fully loaded
- *   * CONSTRAINT spreadsheet_id UNIQUE
- *
- * TABLE sheets
- *   * __rowid (int)
- *     * Key
+ *     * This is the last time we confirmed access to this file
+ * 
+ * TABLE etl_jobs
+ *   * id (int) PRIMARY KEY
+ *     * Key 
  *     * Databases require an increasing value to make INSERTs fast
- *   * spreadsheet_rowid
- *     * Match above table's key
+ *   * spreadsheet_id FOREIGN KEY spreadsheets.id
  *   * sheet_name (string)
  *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties
  *     * The allowable set of sheet names is currently undefined behavior per Google API documentation (issue reported)
- *   * last_loaded (string, RFC 3339 date-time, nullable)
- *     * Matches last_modified when loaded
- *   * table_name (string)
+ *   * target_table (string)
  *     * Pointer to the table where this sheet is stored in the data store
- *   * CONSTRAINT spreadsheet_id, sheet_name UNIQUE
+ *   * google_modified
+ *     * Matches spreadsheets.google_modified when loaded
+ *   * CONSTRAINT sheet_name (spreadsheet_id, sheet_name)
+ * 
+ * TABLE target_table (this will have various names)
+ *   * _rowid (int) PRIMARY KEY
+ *   * _origin_etl_job_id FOREIGN KEY etl_jobs.id
+ *   * _origin_row (int)
+ *   * CONSTRAINT _origin_row (_origin_etl_job_id, _origin_row)
  */
 abstract class DatabaseAgent
 {
     /**
-     * Schema prefix, like 'otherdatabase.'
+     * Schema prefix, like 'otherdatabase'
      * @var ?string
      */
     public $schema;
@@ -64,10 +69,8 @@ abstract class DatabaseAgent
         switch ($newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
             case 'sqlite':
                 return new DatabaseAgentSqlite($newDatabase);
-                break;
             case 'mysql':
                 return new DatabaseAgentMysql($newDatabase);
-                break;
             default:
                 echo "Unexpected driver: " . $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
                 exit(1);
@@ -77,79 +80,72 @@ abstract class DatabaseAgent
     protected function __construct(\PDO $newDatabase)
     {
         $this->database = $newDatabase;
-        $this->loadTime = date('Y-m-d H:i:s');
+        $this->loadTime = time();
     }
 
     // Getters /////////////////////////////////////////////////////////////////
 
     /**
-     * @return string The time this script loaded, in YYYY-MM-DD HH:MM-SS format
+     * @return int The time this script loaded, in YYYY-MM-DD HH:MM-SS format
      */
-    public function getLoadTime(): string
+    final public function getLoadTime(): int
     {
         return $this->loadTime;
     }
 
     /**
-     * Get table name for a sheet
-     *
-     * @param $spreadsheetId string the spreadsheet ID to query
-     * @param $sheetName string the sheet name to query
-     * @return the table name for the sheet, or null if sheet is not loaded
-     */
-    abstract public function getTableNameForSheet(string $spreadsheetId, string $sheetName): ?string;
-    
-    /**
-     * For all spreadsheets which are fully loaded, get the one with the
-     * greatest lexical order of (modified_time, spreadsheet_id), or null if no
-     * spreadsheets are loaded
+     * For all spreadsheets which are partially or fully loaded, get the one
+     * with the greatest lexical order of (google_modified,
+     * google_spreadsheet_id), or null if no spreadsheets are loaded
      *
      * @see https://tools.ietf.org/html/rfc3339
      *
-     * @return array like ['2015-01-01 03:04:05', '349u948k945kd43-k35529_298k938']
+     * @return array like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
      */
     abstract public function getGreatestModifiedAndIdLoaded(): ?array;
 
     /**
-     * For all spreadsheets with authorization confirmed on or after the given
-     * date, get the greatest spreadsheet ID
+     * For all spreadsheets seen on or after the given date, get the greatest
+     * Google spreadsheet ID
      *
-     * @param string int a Unix timestamp
-     * @return ?string spreadsheet ID or null
+     * @param integer $since a Unix timestamp
+     * @return string|null
      */
-    abstract public function getGreatestIdWithAuthorizationCheckedSince(int $since): ?string;
+    abstract public function getGreatestIdSeenSince(int $since): ?string;
 
     /**
-     * Get all spreadsheets which did not have authorization confirmed on or
-     * after the given time
+     * Get all spreadsheets which were not seen after the given time
      *
-     * @param string int a Unix timestamp
-     * @param int limit a maximum quantity of results to return
-     * @return array spreadsheet IDs in order starting with the least and
-     *               including up to LIMIT number of rows
+     * @param integer $since  a Unix timestamp
+     * @param integer $limit  limit a maximum quantity of results to return
+     * @return array          Google spreadsheet IDs in order starting with the
+     *                        least and including up to LIMIT number of rows
      */
-    abstract public function getIdsWithAuthorizationNotCheckedSince(string $since, int $limit): array;
+    abstract public function getIdsNotSeenSince(int $since, int $limit): array;
+
+    /**
+     * Get ETL details for a specific spreadsheet and sheet
+     *
+     * @param string $googleSpreadsheetId  specified Google spreadsheet ID
+     * @param string $sheetName            specified sheet name
+     * @return \stdClass|null              ETL information
+     */
+    abstract public function getEtl(string $googleSpreadsheetId, string $sheetName): ?\stdClass;
 
     // Accounting //////////////////////////////////////////////////////////////
 
     /**
      * The accounting must be set up before any other methods are called
      *
-     * @apiSpec Calling this method twice shall not cause any data loss or any
-     *          error.
+     * @apiSpec Calling this method twice shall not cause data loss or error.
      */
     abstract protected function setUpAccounting();
 
     /**
-     * Account that a spreadsheet is authorized
+     * Account that a spreadsheet is seen, this confirms we have access
      */
-    abstract public function accountSpreadsheetAuthorized(string $spreadsheetId, string $lastModified);
+    abstract public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified);
     
-    /**
-     * Account that a spreadsheet is fully loaded (after all sheets loaded)
-     */
-    abstract public function accountSpreadsheetLoaded(string $spreadsheetId, string $lastModified);
-
     // Data store //////////////////////////////////////////////////////////////
 
     /**
@@ -158,16 +154,5 @@ abstract class DatabaseAgent
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
      */
-    abstract public function loadAndAccountSheet(string $spreadsheetId, string $sheetName, string $tableName, string $modifiedTime, array $columns, array $rows);
-
-    /**
-     * Removes sheets and accounting for any sheets that do not have the latest
-     * known data loaded
-     */
-    abstract public function removeOutdatedSheets(string $spreadsheetId);
-
-    /**
-     * Removes sheets and accounting for given spreadsheet
-     */
-    abstract public function removeSpreadsheet(string $spreadsheetId);
+    abstract public function loadAndAccountSheet(string $googleSpreadsheetId, string $sheetName, string $targetTable, string $googleModified, array $columnNames, array $rows);
 }

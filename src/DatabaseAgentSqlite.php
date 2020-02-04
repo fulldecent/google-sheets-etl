@@ -310,7 +310,7 @@ SQL;
                         : $v;
             }, $parameters);
             $statement->execute($parameters);
-            echo '        loaded ' . ($this->arrayKeyLast($rowChunk) + 1) . ' rows' . PHP_EOL;
+            echo '        loaded ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
         }
 
         // All done
@@ -365,11 +365,5 @@ SQL;
             array_push($retval, '`' . $column . '`');
         }
         return $retval;
-    }
-
-    private function arrayKeyLast(array $array)
-    {
-        end($array);
-        return key($array);
     }
 }

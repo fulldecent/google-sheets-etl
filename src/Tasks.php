@@ -106,11 +106,11 @@ class Tasks
         }
         */
         foreach ($this->configurationForSpreadsheetSheet[$googleSpreadsheetId] as $sheetName => $configuration) {
-            $etlJob = $this->databaseAgent->getEtl($googleSpreadsheetId, $sheetName);
+            $etlJob = $this->databaseAgent->getEtl($googleSpreadsheetId, (string)$sheetName);
             if (!is_null($etlJob) && $etlJob->loaded_google_modified === $etlJob->latest_google_modified) {
                 continue; // Skip, already loaded this sheet version
             }
-            $this->loadSheet($googleSpreadsheetId, $sheetName, $googleModified); 
+            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified); 
         }
     }
 

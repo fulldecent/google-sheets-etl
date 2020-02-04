@@ -291,6 +291,7 @@ SQL;
         $this->database->prepare($deleteSql)->execute([$etlJobId]);
 
         // Insert rows /////////////////////////////////////////////////////////
+//        $this->database->exec("SET SESSION sql_mode = 'TRADITIONAL'");
         echo '    Inserting rows';
         $quotedColumns = implode(',', array_merge(['_origin_etl_job_id', '_origin_row'], $normalizedQuotedColumnNames));
         $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
@@ -303,6 +304,7 @@ SQL;
             }
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
+/*
             $parameters = array_map(function($v){
                 return is_null($v) 
                     ? null
@@ -310,8 +312,9 @@ SQL;
                         ? substr($v, 0, 100)
                         : $v;
             }, $parameters);
+*/            
             $statement->execute($parameters);
-            echo '        loaded ' . ($this->arrayKeyLast($rowChunk) + 1) . ' rows' . PHP_EOL;
+            echo '        loaded ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
         }
 
         // All done
@@ -368,11 +371,5 @@ SQL;
             array_push($retval, '`' . $column . '`');
         }
         return $retval;
-    }
-
-    private function arrayKeyLast(array $array)
-    {
-        end($array);
-        return key($array);
     }
 }

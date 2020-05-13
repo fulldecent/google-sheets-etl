@@ -62,7 +62,7 @@ class Tasks
      */
     public function loadSheet(string $googleSpreadsheetId, string $sheetName, string $googleModified)
     {
-        echo '  Loading speadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
+        echo '  Loading spreadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
         $configuration = $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName];
         $targetTable = $configuration->targetTable;
 
@@ -72,14 +72,17 @@ class Tasks
         try {
             $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
         } catch (\Exception $exception) {
-            echo '   ERROR: ' . $exception->getMessage();
-            throw new \Exception('With spreadsheet ' . $googleSpreadsheetId . "\n" . $exception->getMessage());
+            throw new \Exception('With spreadsheet https://docs.google.com/spreadsheets/d/' . $googleSpreadsheetId . "\nWith sheet $sheetName\n" . $exception->getMessage());
         }
         echo '     Loading';
         $headers = array_keys($configuration->columnMapping);
-        $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
-        $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified);
-        $this->databaseAgent->loadAndAccountSheet($googleSpreadsheetId, $sheetName, $targetTable, $googleModified, $headers, $dataRows);
+        try {
+            $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
+            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified);
+            $this->databaseAgent->loadAndAccountSheet($googleSpreadsheetId, $sheetName, $targetTable, $googleModified, $headers, $dataRows);
+        } catch (\Exception $exception) {
+            throw new \Exception('With spreadsheet https://docs.google.com/spreadsheets/d/' . $googleSpreadsheetId . "\nWith sheet $sheetName\n" . $exception->getMessage());
+        }
     }
 
     /**
@@ -94,7 +97,7 @@ class Tasks
      */
     public function loadSpreadsheet(string $googleSpreadsheetId, string $googleModified)
     {
-        echo 'Loading speadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
+        echo 'Loading spreadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
         /*
         $sheetsToLoad = $this->googleSheetsAgent->getGridSheetTitles($googleSpreadsheetId);
         foreach ($sheetsToLoad as $sheetName) {
@@ -106,11 +109,11 @@ class Tasks
         }
         */
         foreach ($this->configurationForSpreadsheetSheet[$googleSpreadsheetId] as $sheetName => $configuration) {
-            $etlJob = $this->databaseAgent->getEtl($googleSpreadsheetId, $sheetName);
+            $etlJob = $this->databaseAgent->getEtl($googleSpreadsheetId, (string)$sheetName);
             if (!is_null($etlJob) && $etlJob->loaded_google_modified === $etlJob->latest_google_modified) {
                 continue; // Skip, already loaded this sheet version
             }
-            $this->loadSheet($googleSpreadsheetId, $sheetName, $googleModified); 
+            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified); 
         }
     }
 

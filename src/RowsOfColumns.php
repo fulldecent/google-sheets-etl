@@ -34,6 +34,7 @@ class RowsOfColumns
             if (is_int($specifier)) {
                 $retval[] = $specifier;
             } elseif (is_string($specifier)) {
+//                $selector = array_search(strtolower($specifier), array_map('strtolower',$row), true);
                 $selector = array_search($specifier, $row, true);
                 if ($selector === false) {
                     throw new \Exception('Required column not found: ' . $specifier);

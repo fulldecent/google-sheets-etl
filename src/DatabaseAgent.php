@@ -17,8 +17,9 @@ use stdClass;
  *   * id (int) PRIMARY KEY
  *     * Key
  *     * Databases require an increasing value to make INSERTs fast
- *   * google_spreadsheet_id (string |^[0-9a-zA-Z_/-]{44}$|i) (UNIQUE)
+ *   * google_spreadsheet_id (string |^[a-zA-Z0-9-_]{44}$|i) (UNIQUE)
  *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
+ *     * https://developers.google.com/sheets/api/guides/concepts
  *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue reported)
  *     * This regex is an estimate
  *   * google_modified (string, RFC 3339 date-time)

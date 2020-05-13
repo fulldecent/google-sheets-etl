@@ -41,7 +41,7 @@ class GoogleSheetsAgent
      *
      * @return array Array with elements ID -> modifiedTime (RFC 3339 format)
      *
-     * @see https://developers.google.com/drive/api/v3/reference/files#list
+     * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339
      */
     public function getOldestSpreadsheets(string $modifiedTime = '2001-01-01T12:00:00', string $id = '', int $count = 500): array
@@ -54,12 +54,24 @@ class GoogleSheetsAgent
         
         // Collect file list
         $optParams = [
+            //'corpora'=> 'domain',
             'orderBy' => 'modifiedTime',
             'pageSize' => $count, // Google default is 100, maximum is 1000
             'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedTime'",
-            'fields' => 'nextPageToken, files(id,modifiedTime)'
+            #'fields' => 'nextPageToken, files(id,modifiedTime)',
+            'fields' => 'files(id,modifiedTime)',
+            'supportsAllDrives' => 'true',
+            'includeItemsFromAllDrives' => 'true',
+            'includeTeamDriveItems' => 'true',
+            'supportsTeamDrives' => 'true',
+//            'corpora' => 'drive',
+            'corpora' => 'allDrives',
+//            'driveId' => '0AAGLxubfP1gqUk9PVA' // PMT Owners Shared Drive
         ];
+//        print_r($optParams);
+        // https://developers.google.com/drive/api/v3/reference/files/list
         $results = $googleService->files->listFiles($optParams);
+//        print_r($results);
         foreach ($results->getFiles() as $file) {
             if ($file->getModifiedTime() <= $modifiedTime) {
                 if ($file->getId() < $id) {

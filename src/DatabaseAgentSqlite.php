@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     google_spreadsheet_id VARCHAR(44) NOT NULL,
     google_modified VARCHAR(99) NOT NULL,
+    google_spreadsheet_name VARCHAR(100) NOT NULL,
     last_seen INT NOT NULL,
     CONSTRAINT google_spreadsheet_id UNIQUE (google_spreadsheet_id)
 );
@@ -171,23 +172,34 @@ SQL;
     /**
      * Account that a spreadsheet is seen, this confirms we have access
      */
-    public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified)
+    public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<SQL
 INSERT OR IGNORE INTO $quotedSpreadsheetsTable
-(google_spreadsheet_id, google_modified, last_seen)
+(google_spreadsheet_id, google_modified, google_spreadsheet_name, last_seen)
 VALUES
-(:google_spreadsheet_id, :google_modified, :last_seen)
+(:google_spreadsheet_id, :google_modified, :google_spreadsheet_name, :last_seen)
 SQL;
-        $this->database->prepare($sql)->execute(['google_spreadsheet_id'=>$googleSpreadsheetId, 'google_modified'=>$googleModified, 'last_seen'=>$this->loadTime]);
+        $this->database->prepare($sql)->execute([
+            'google_spreadsheet_id'=>$googleSpreadsheetId,
+            'google_modified'=>$googleModified,
+            'google_spreadsheet_name'=>$name,
+            'last_seen'=>$this->loadTime
+        ]);
         $sql = <<<SQL
 UPDATE $quotedSpreadsheetsTable
    SET google_modified = :google_modified
+     , google_spreadsheet_name = :google_spreadsheet_name
      , last_seen = :last_seen
  WHERE google_spreadsheet_id = :google_spreadsheet_id
 SQL;
-        $this->database->prepare($sql)->execute(['google_spreadsheet_id'=>$googleSpreadsheetId, 'google_modified'=>$googleModified, 'last_seen'=>$this->loadTime]);
+        $this->database->prepare($sql)->execute([
+            'google_spreadsheet_id'=>$googleSpreadsheetId,
+            'google_modified'=>$googleModified,
+            'google_spreadsheet_name'=>$name,
+            'last_seen'=>$this->loadTime
+        ]);
     }
 
     // Data store //////////////////////////////////////////////////////////////

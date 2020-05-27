@@ -58,14 +58,13 @@ class GoogleSheetsAgent
             'orderBy' => 'modifiedTime',
             'pageSize' => $count, // Google default is 100, maximum is 1000
             'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedTime'",
-            #'fields' => 'nextPageToken, files(id,modifiedTime)',
-            'fields' => 'files(id,modifiedTime)',
+            'fields' => 'files(id,modifiedTime,name)',
             'supportsAllDrives' => 'true',
             'includeItemsFromAllDrives' => 'true',
             'includeTeamDriveItems' => 'true',
             'supportsTeamDrives' => 'true',
-//            'corpora' => 'drive',
             'corpora' => 'allDrives',
+//            'corpora' => 'drive',
 //            'driveId' => '0AAGLxubfP1gqUk9PVA' // PMT Owners Shared Drive
         ];
 //        print_r($optParams);
@@ -78,7 +77,7 @@ class GoogleSheetsAgent
                     continue;
                 }
             }
-            $retval[$file->getId()] = $file->getModifiedTime();
+            $retval[$file->getId()] = (object)['modifiedTime'=>$file->getModifiedTime(), 'name'=>$file->getName()];
         }
         return $retval;
     }

@@ -22,6 +22,8 @@ use stdClass;
  *     * https://developers.google.com/sheets/api/guides/concepts
  *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue reported)
  *     * This regex is an estimate
+ *   * google_spreadsheet_name (string)
+ *     * https://stackoverflow.com/questions/62050607/what-is-a-string-in-the-google-drive-api
  *   * google_modified (string, RFC 3339 date-time)
  *     * https://developers.google.com/drive/api/v3/reference/files
  *   * last_seen (int)
@@ -145,7 +147,7 @@ abstract class DatabaseAgent
     /**
      * Account that a spreadsheet is seen, this confirms we have access
      */
-    abstract public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified);
+    abstract public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name);
     
     // Data store //////////////////////////////////////////////////////////////
 

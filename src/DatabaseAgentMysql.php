@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
     id INT NOT NULL AUTO_INCREMENT,
     google_spreadsheet_id VARCHAR(44) NOT NULL,
     google_modified VARCHAR(99) NOT NULL,
+    google_spreadsheet_name VARCHAR(100) NOT NULL,
     last_seen INT NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY google_spreadsheet_id (google_spreadsheet_id)
@@ -137,23 +138,34 @@ SQL;
     /**
      * Account that a spreadsheet is seen, this confirms we have access
      */
-    public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified)
+    public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name)
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<SQL
 INSERT IGNORE INTO $quotedSpreadsheetsTable
-(google_spreadsheet_id, google_modified, last_seen)
+(google_spreadsheet_id, google_modified, google_spreadsheet_name, last_seen)
 VALUES
-(:google_spreadsheet_id, :google_modified, :last_seen)
+(:google_spreadsheet_id, :google_modified, :google_spreadsheet_name, :last_seen)
 SQL;
-        $this->database->prepare($sql)->execute(['google_spreadsheet_id'=>$googleSpreadsheetId, 'google_modified'=>$googleModified, 'last_seen'=>$this->loadTime]);
+        $this->database->prepare($sql)->execute([
+            'google_spreadsheet_id'=>$googleSpreadsheetId,
+            'google_modified'=>$googleModified,
+            'google_spreadsheet_name'=>$name,
+            'last_seen'=>$this->loadTime
+        ]);
         $sql = <<<SQL
 UPDATE $quotedSpreadsheetsTable
    SET google_modified = :google_modified
+     , google_spreadsheet_name = :google_spreadsheet_name
      , last_seen = :last_seen
  WHERE google_spreadsheet_id = :google_spreadsheet_id
 SQL;
-        $this->database->prepare($sql)->execute(['google_spreadsheet_id'=>$googleSpreadsheetId, 'google_modified'=>$googleModified, 'last_seen'=>$this->loadTime]);
+        $this->database->prepare($sql)->execute([
+            'google_spreadsheet_id'=>$googleSpreadsheetId,
+            'google_modified'=>$googleModified,
+            'google_spreadsheet_name'=>$name,
+            'last_seen'=>$this->loadTime
+        ]);
     }
     
     /**
@@ -292,7 +304,7 @@ SQL;
 
         // Insert rows /////////////////////////////////////////////////////////
 //        $this->database->exec("SET SESSION sql_mode = 'TRADITIONAL'");
-        echo '    Inserting rows';
+        echo '    Inserting rows' . PHP_EOL;
         $quotedColumns = implode(',', array_merge(['_origin_etl_job_id', '_origin_row'], $normalizedQuotedColumnNames));
         $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
         $sqlOneValueList = implode(',', array_fill(0, count($columnNames) + 2, '?'));

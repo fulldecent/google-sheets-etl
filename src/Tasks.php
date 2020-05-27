@@ -52,15 +52,15 @@ class Tasks
     /**
      * Load one sheet to database
      *
-     * @implNote: This could reduce the transaction locking time by using a
-     *            temporary table to stage incoming data.
+     * @implNote: Potential improvement: reduce transaction locking time by
+     *            using a temporary table to stage incoming data.
      *
      * @param string $googleSpreadsheetId
      * @param string $sheetName
      * @param string $googleModified
      * @return void
      */
-    public function loadSheet(string $googleSpreadsheetId, string $sheetName, string $googleModified)
+    public function loadSheet(string $googleSpreadsheetId, string $sheetName, string $googleModified, string $googleSpreadsheetName)
     {
         echo '  Loading spreadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
         $configuration = $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName];
@@ -78,7 +78,7 @@ class Tasks
         $headers = array_keys($configuration->columnMapping);
         try {
             $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
-            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified);
+            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified, $googleSpreadsheetName);
             $this->databaseAgent->loadAndAccountSheet($googleSpreadsheetId, $sheetName, $targetTable, $googleModified, $headers, $dataRows);
         } catch (\Exception $exception) {
             throw new \Exception('With spreadsheet https://docs.google.com/spreadsheets/d/' . $googleSpreadsheetId . "\nWith sheet $sheetName\n" . $exception->getMessage());
@@ -95,7 +95,7 @@ class Tasks
      * @param string $googleModified RFC 3339 modified time
      * @return void
      */
-    public function loadSpreadsheet(string $googleSpreadsheetId, string $googleModified)
+    public function loadSpreadsheet(string $googleSpreadsheetId, string $googleModified, string $googleSpreadsheetName)
     {
         echo 'Loading spreadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
         /*
@@ -113,7 +113,7 @@ class Tasks
             if (!is_null($etlJob) && $etlJob->loaded_google_modified === $etlJob->latest_google_modified) {
                 continue; // Skip, already loaded this sheet version
             }
-            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified); 
+            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified, $googleSpreadsheetName); 
         }
     }
 
@@ -129,14 +129,14 @@ class Tasks
             list($lastModified, $googleSpreadsheetId) = $result;
         }
         echo 'Prior ETL is synchronized up to: ' . $lastModified . PHP_EOL . PHP_EOL;
-        $someNewSpreadsheetsIds = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $googleSpreadsheetId);
-        foreach ($someNewSpreadsheetsIds as $googleSpreadsheetId => $googleModified) {
-            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified);
+        $someNewSpreadsheets = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $googleSpreadsheetId);
+        foreach ($someNewSpreadsheets as $googleSpreadsheetId => $spreadsheet) {
+            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $spreadsheet->modifiedTime, $spreadsheet->name);
             if (!isset($this->configurationForSpreadsheetSheet[$googleSpreadsheetId])) {
-                echo 'Skipping speadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
+                echo 'Skipping speadsheetId ' . $googleSpreadsheetId . PHP_EOL;
                 continue;
             }
-            $this->loadSpreadsheet($googleSpreadsheetId, $googleModified);
+            $this->loadSpreadsheet($googleSpreadsheetId, $spreadsheet->modifiedTime, $spreadsheet->name);
         }
     }
 }

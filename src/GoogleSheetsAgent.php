@@ -83,7 +83,7 @@ class GoogleSheetsAgent
     }
     
     /**
-     * Return all sheets of type GRID into a Google Spreadsheet
+     * Return all sheets of type GRID in a Google Spreadsheet
      *
      * @param string $spreadsheetId which spreadsheet to load
      *

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A structure which holds an array (rows) of arrays (columns) containing data.
+ * A structure which holds an array (rows) of arrays (columns) containing string data.
  *
  * Empty trailing rows and columns will not be included.
  * @reference https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange
@@ -16,7 +16,13 @@ class RowsOfColumns
 
     function __construct(array $values)
     {
-        $this->rowsOfColumns = $values;
+        $temp = [];
+        foreach ($values as $rowIndex=>$columns) {
+            foreach ($columns as $columnIndex=>$stringData) {
+                $temp[$rowIndex][$columnIndex] = trim($stringData);
+            }
+        }
+        $this->rowsOfColumns = $temp;
     }
 
     /**

@@ -12,16 +12,16 @@ class DatabaseAgentSqlite extends DatabaseAgent
     /**
      * Beware max_allowed_packet errors
      * Beware SQLITE_LIMIT_VARIABLE_NUMBER
-     * 
+     *
      * @see https://sqlite.org/c3ref/c_limit_attached.html
-     * 
+     *
      * @var int
      */
     public $sqlInsertChunkSize = 25;
 
     public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
     public const ETL_JOBS_TABLE = '__meta_etl_jobs';
-    
+
     // Getters /////////////////////////////////////////////////////////////////
 
     /**
@@ -298,7 +298,7 @@ SQL;
         $deleteSql = <<<SQL
 DELETE FROM $quotedTargetTable
  WHERE _origin_etl_job_id = ?
-SQL;        
+SQL;
         $this->database->prepare($deleteSql)->execute([$etlJobId]);
 
         // Insert rows /////////////////////////////////////////////////////////
@@ -315,7 +315,7 @@ SQL;
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
             $parameters = array_map(function($v){
-                return is_null($v) 
+                return is_null($v)
                     ? null
                     : is_string($v)
                         ? substr($v, 0, 100)

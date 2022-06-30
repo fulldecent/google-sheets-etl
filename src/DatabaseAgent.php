@@ -29,10 +29,10 @@ use stdClass;
  *   * last_seen (int)
  *     * Unix timestamp, system time
  *     * This is the last time we confirmed access to this file
- * 
+ *
  * TABLE etl_jobs
  *   * id (int) PRIMARY KEY
- *     * Key 
+ *     * Key
  *     * Databases require an increasing value to make INSERTs fast
  *   * spreadsheet_id FOREIGN KEY spreadsheets.id
  *   * sheet_name (string)
@@ -43,7 +43,7 @@ use stdClass;
  *   * google_modified
  *     * Matches spreadsheets.google_modified when loaded
  *   * CONSTRAINT sheet_name (spreadsheet_id, sheet_name)
- * 
+ *
  * TABLE target_table (this will have various names)
  *   * _rowid (int) PRIMARY KEY
  *   * _origin_etl_job_id FOREIGN KEY etl_jobs.id
@@ -79,7 +79,7 @@ abstract class DatabaseAgent
                 exit(1);
         }
     }
-    
+
     protected function __construct(\PDO $newDatabase)
     {
         $this->database = $newDatabase;
@@ -148,7 +148,7 @@ abstract class DatabaseAgent
      * Account that a spreadsheet is seen, this confirms we have access
      */
     abstract public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name);
-    
+
     // Data store //////////////////////////////////////////////////////////////
 
     /**

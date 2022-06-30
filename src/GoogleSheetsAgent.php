@@ -13,7 +13,7 @@ class GoogleSheetsAgent
     private /* \Google_Client */ $googleClient;
     private /* float */ $loadTime;
     private /* int */ $numberOfRequestsThisSession = 0;
-    
+
     public function __construct(string $newCredentialsFile)
     {
         json_decode(file_get_contents($newCredentialsFile)); // Validate file
@@ -22,13 +22,13 @@ class GoogleSheetsAgent
         $this->googleClient->setAuthConfig($this->credentialsFile);
         $this->loadTime = microtime(true);
     }
-    
+
     public function getAccountName()
     {
         $config = json_decode(file_get_contents($this->credentialsFile));
         return $config->client_email;
     }
-    
+
     /**
      * List Google Sheets files chronologically by last modified date
      *
@@ -51,7 +51,7 @@ class GoogleSheetsAgent
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
         $googleService = new \Google_Service_Drive($this->googleClient);
         $this->throttleIfNecessary();
-        
+
         // Collect file list
         $optParams = [
             //'corpora'=> 'domain',
@@ -81,7 +81,7 @@ class GoogleSheetsAgent
         }
         return $retval;
     }
-    
+
     /**
      * Return all sheets of type GRID in a Google Spreadsheet
      *
@@ -97,7 +97,7 @@ class GoogleSheetsAgent
         $this->googleClient->setScopes(\Google_Service_Sheets::SPREADSHEETS_READONLY);
         $googleService = new \Google_Service_Sheets($this->googleClient);
         $this->throttleIfNecessary();
-        
+
         // Collect file list
         $optParams = [
             'spreadsheetId' => $spreadsheetId,
@@ -113,7 +113,7 @@ class GoogleSheetsAgent
         }
         return $retval;
     }
-    
+
     /**
      * Load data from Google Sheets sheet as an array (rows) of arrays (columns)
      *
@@ -129,7 +129,7 @@ class GoogleSheetsAgent
         $this->googleClient->setScopes(\Google_Service_Sheets::SPREADSHEETS_READONLY);
         $googleService = new \Google_Service_Sheets($this->googleClient);
         $this->throttleIfNecessary();
-        
+
         // Collect row data from sheet
         $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
         return new RowsOfColumns($response->getValues());

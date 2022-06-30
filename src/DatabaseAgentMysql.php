@@ -167,7 +167,7 @@ SQL;
             'last_seen'=>$this->loadTime
         ]);
     }
-    
+
     /**
      * Get ETL details for a specific spreadsheet and sheet
      *
@@ -299,7 +299,7 @@ SQL;
         $deleteSql = <<<SQL
 DELETE FROM $quotedTargetTable
  WHERE _origin_etl_job_id = ?
-SQL;        
+SQL;
         $this->database->prepare($deleteSql)->execute([$etlJobId]);
 
         // Insert rows /////////////////////////////////////////////////////////
@@ -318,13 +318,13 @@ SQL;
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
 /*
             $parameters = array_map(function($v){
-                return is_null($v) 
+                return is_null($v)
                     ? null
                     : is_string($v)
                         ? substr($v, 0, 100)
                         : $v;
             }, $parameters);
-*/            
+*/
             $statement->execute($parameters);
             echo '        loaded ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
         }

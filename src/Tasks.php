@@ -113,7 +113,7 @@ class Tasks
             if (!is_null($etlJob) && $etlJob->loaded_google_modified === $etlJob->latest_google_modified) {
                 continue; // Skip, already loaded this sheet version
             }
-            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified, $googleSpreadsheetName); 
+            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified, $googleSpreadsheetName);
         }
     }
 

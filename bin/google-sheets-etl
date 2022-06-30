@@ -9,7 +9,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 set_time_limit(300);
 error_reporting(E_ALL);
 
-## Banner ######################################################################
+// Banner //////////////////////////////////////////////////////////////////////
 echo 'GOOGLE SHEETS ETL TOOL' . PHP_EOL;
 
 if (!is_array($argv) || count($argv) < 4) {
@@ -17,7 +17,7 @@ if (!is_array($argv) || count($argv) < 4) {
     die();
 }
 
-## Program #####################################################################
+// Program /////////////////////////////////////////////////////////////////////
 
 $googleServiceAccountCredentialFile = $argv[1];
 $etlSchemaFile = $argv[2];

@@ -216,7 +216,6 @@ SQL;
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
-        $this->database->beginTransaction();
 
         // Create table ////////////////////////////////////////////////////////
         echo '    Creating table';
@@ -243,6 +242,8 @@ SQL;
                 // Ignore if column already exists
             }
         }
+
+        $this->database->beginTransaction(); // the CREATE/UPDATE above are implicit-commit statements
 
         // Update accounting ///////////////////////////////////////////////////
         $insertAccountingSql = <<<SQL

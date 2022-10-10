@@ -38,7 +38,11 @@ class RowsOfColumns
         $row = $this->rowsOfColumns[$headerRow];
         foreach ($specifiers as $specifier) {
             if (is_int($specifier)) {
-                $retval[] = $specifier;
+                if ($specifier < count($row)) {
+                    $retval[] = $specifier;
+                } else {
+                    throw new \Exception("Column index out of bounds: $specifier");
+                }
             } elseif (is_string($specifier)) {
 //                $selector = array_search(strtolower($specifier), array_map('strtolower',$row), true);
                 $selector = array_search($specifier, $row, true);
@@ -46,6 +50,8 @@ class RowsOfColumns
                     throw new \Exception('Required column not found: ' . $specifier);
                 }
                 $retval[] = $selector;
+            } else {
+                throw new \Exception('Invalid column specifier: ' . $specifier);
             }
         }
         return $retval;

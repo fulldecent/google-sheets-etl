@@ -20,7 +20,7 @@ use stdClass;
  *   * google_spreadsheet_id (string |^[a-zA-Z0-9-_]{44}$|i) (UNIQUE)
  *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
  *     * https://developers.google.com/sheets/api/guides/concepts
- *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue 
+ *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue
  *       reported)
  *     * This regex is an estimate
  *   * google_spreadsheet_name (string)
@@ -159,5 +159,12 @@ abstract class DatabaseAgent
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
      */
-    abstract public function loadAndAccountSheet(string $googleSpreadsheetId, string $sheetName, string $targetTable, string $googleModified, array $columnNames, array $rows);
+    abstract public function loadAndAccountSheet(
+        string $googleSpreadsheetId,
+        string $sheetName,
+        string $targetTable,
+        string $googleModified,
+        array $columnNames,
+        array $rows
+    );
 }

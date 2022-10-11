@@ -44,8 +44,11 @@ class GoogleSheetsAgent
      * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339
      */
-    public function getOldestSpreadsheets(string $modifiedTime = '2001-01-01T12:00:00', string $id = '', int $count = 500): array
-    {
+    public function getOldestSpreadsheets(
+        string $modifiedTime = '2001-01-01T12:00:00',
+        string $id = '',
+        int $count = 500
+    ): array {
         $retval = [];
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);

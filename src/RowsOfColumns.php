@@ -14,11 +14,11 @@ class RowsOfColumns
 {
     private /* array */ $rowsOfColumns;
 
-    function __construct(array $values)
+    public function __construct(array $values)
     {
         $temp = [];
-        foreach ($values as $rowIndex=>$columns) {
-            foreach ($columns as $columnIndex=>$stringData) {
+        foreach ($values as $rowIndex => $columns) {
+            foreach ($columns as $columnIndex => $stringData) {
                 $temp[$rowIndex][$columnIndex] = trim($stringData);
             }
         }
@@ -32,7 +32,7 @@ class RowsOfColumns
      * @param integer $headerRow   which row (zero-indexed) to retrieve from
      * @return array               columns (zero-indexed) for names specified
      */
-    function getColumnSelectorsFromHeaderRow(array $specifiers, int $headerRow = 0): array
+    public function getColumnSelectorsFromHeaderRow(array $specifiers, int $headerRow = 0): array
     {
         $retval = [];
         $row = $this->rowsOfColumns[$headerRow];
@@ -66,7 +66,7 @@ class RowsOfColumns
      * @return array                    rows, each containing an array (columns)
      *                                  of values
      */
-    function getRows(array $columnSelectors, int $skipRows = 1): array
+    public function getRows(array $columnSelectors, int $skipRows = 1): array
     {
         $retval = [];
         foreach (array_slice($this->rowsOfColumns, $skipRows) as $row) {

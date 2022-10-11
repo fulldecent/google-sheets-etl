@@ -37,7 +37,9 @@ class Tasks
     public function setConfiguration(\stdClass $configuration)
     {
         foreach ($configuration as $googleSpreadsheetId => $spreadsheetConfiguration) {
-            if ($googleSpreadsheetId == '$schema') continue;
+            if ($googleSpreadsheetId == '$schema') {
+                continue;
+            }
             foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
                 $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName] = (object)[
                     'targetTable' => $configuration->targetTable, # Required property
@@ -60,8 +62,12 @@ class Tasks
      * @param string $googleModified
      * @return void
      */
-    public function loadSheet(string $googleSpreadsheetId, string $sheetName, string $googleModified, string $googleSpreadsheetName)
-    {
+    public function loadSheet(
+        string $googleSpreadsheetId,
+        string $sheetName,
+        string $googleModified,
+        string $googleSpreadsheetName
+    ) {
         echo '  Loading spreadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
         $configuration = $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName];
         $targetTable = $configuration->targetTable;
@@ -70,18 +76,38 @@ class Tasks
         $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($googleSpreadsheetId, $sheetName);
         echo '    Selecting columns';
         try {
-            $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow($configuration->columnMapping, $configuration->headerRow);
+            $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow(
+                $configuration->columnMapping,
+                $configuration->headerRow
+            );
         } catch (\Exception $exception) {
-            throw new \Exception('With spreadsheet https://docs.google.com/spreadsheets/d/' . $googleSpreadsheetId . "\nWith sheet $sheetName\n" . $exception->getMessage());
+            throw new \Exception(
+                'With spreadsheet https://docs.google.com/spreadsheets/d/' .
+                $googleSpreadsheetId .
+                "\nWith sheet $sheetName\n" .
+                $exception->getMessage()
+            );
         }
         echo '     Loading';
         $headers = array_keys($configuration->columnMapping);
         try {
             $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
             $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified, $googleSpreadsheetName);
-            $this->databaseAgent->loadAndAccountSheet($googleSpreadsheetId, $sheetName, $targetTable, $googleModified, $headers, $dataRows);
+            $this->databaseAgent->loadAndAccountSheet(
+                $googleSpreadsheetId,
+                $sheetName,
+                $targetTable,
+                $googleModified,
+                $headers,
+                $dataRows
+            );
         } catch (\Exception $exception) {
-            throw new \Exception('With spreadsheet https://docs.google.com/spreadsheets/d/' . $googleSpreadsheetId . "\nWith sheet $sheetName\n" . $exception->getMessage());
+            throw new \Exception(
+                'With spreadsheet https://docs.google.com/spreadsheets/d/' .
+                $googleSpreadsheetId .
+                "\nWith sheet $sheetName\n" .
+                $exception->getMessage()
+            );
         }
     }
 
@@ -131,7 +157,11 @@ class Tasks
         echo 'Prior ETL is synchronized up to: ' . $lastModified . PHP_EOL . PHP_EOL;
         $someNewSpreadsheets = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $googleSpreadsheetId);
         foreach ($someNewSpreadsheets as $googleSpreadsheetId => $spreadsheet) {
-            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $spreadsheet->modifiedTime, $spreadsheet->name);
+            $this->databaseAgent->accountSpreadsheetSeen(
+                $googleSpreadsheetId,
+                $spreadsheet->modifiedTime,
+                $spreadsheet->name
+            );
             if (!isset($this->configurationForSpreadsheetSheet[$googleSpreadsheetId])) {
                 echo 'Skipping speadsheetId ' . $googleSpreadsheetId . PHP_EOL;
                 continue;

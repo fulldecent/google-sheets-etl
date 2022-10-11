@@ -175,7 +175,8 @@ SQL;
      * @param string $sheetName            specified sheet name
      * @return \stdClass|null              ETL information
      */
-    public function getEtl(string $googleSpreadsheetId, string $sheetName): ?\stdClass {
+    public function getEtl(string $googleSpreadsheetId, string $sheetName): ?\stdClass
+    {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
 
@@ -212,8 +213,14 @@ SQL;
      * @apiSpec This operation shall be atomic, no partial effect may occur on
      *          the database if program is prematurely exited.
      */
-    public function loadAndAccountSheet(string $googleSpreadsheetId, string $sheetName, string $targetTable, string $googleModified, array $columnNames, array $rows)
-    {
+    public function loadAndAccountSheet(
+        string $googleSpreadsheetId,
+        string $sheetName,
+        string $targetTable,
+        string $googleModified,
+        array $columnNames,
+        array $rows
+    ) {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
 

@@ -22,16 +22,19 @@
         ".": {
           "type": "object",
           "pattern": "^[a-zA-Z0-9_-]+$",
-          "title": "The table name to load this sheet as",
+          "title": "A sheet to load",
           "properties": {
             "targetTable": {
-              "type": "string"
+              "type": "string",
+              "title": "The table name to load this sheet as"
             },
             "headerRow": {
-              "type": "integer"
+              "type": "integer",
+              "title": "The row number to use as the header row (zero indexed)"
             },
             "skipRows": {
-              "type": "integer"
+              "type": "integer",
+              "title": "The number of rows to skip before reading data"
             },
             "columnMapping": {
               "type": "object",
@@ -39,10 +42,13 @@
                 ".": {
                   "anyOf": [
                     {
-                      "type": "string"
+                      "type": "string",
+                      "title": "The column name to map to"
                     },
                     {
-                      "type": "integer"
+                      "type": "integer",
+                      "title": "The column number to map to (zero indexed)",
+                      "minimum": 0
                     }
                   ]
                 }

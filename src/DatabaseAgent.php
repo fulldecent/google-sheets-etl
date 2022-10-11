@@ -20,7 +20,8 @@ use stdClass;
  *   * google_spreadsheet_id (string |^[a-zA-Z0-9-_]{44}$|i) (UNIQUE)
  *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
  *     * https://developers.google.com/sheets/api/guides/concepts
- *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue reported)
+ *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue 
+ *       reported)
  *     * This regex is an estimate
  *   * google_spreadsheet_name (string)
  *     * https://stackoverflow.com/questions/62050607/what-is-a-string-in-the-google-drive-api
@@ -28,7 +29,8 @@ use stdClass;
  *     * https://developers.google.com/drive/api/v3/reference/files
  *   * last_seen (int)
  *     * Unix timestamp, system time
- *     * This is the last time we confirmed access to this file
+ *     * This is the last time we confirmed access to this file, a very old time may indicate we no longer have access
+ *       or the file was deleted
  *
  * TABLE etl_jobs
  *   * id (int) PRIMARY KEY
@@ -42,13 +44,13 @@ use stdClass;
  *     * Pointer to the table where this sheet is stored in the data store
  *   * google_modified
  *     * Matches spreadsheets.google_modified when loaded
- *   * CONSTRAINT sheet_name (spreadsheet_id, sheet_name)
+ *   * CONSTRAINT UNIQUE sheet_name (spreadsheet_id, sheet_name)
  *
  * TABLE target_table (this will have various names)
  *   * _rowid (int) PRIMARY KEY
  *   * _origin_etl_job_id FOREIGN KEY etl_jobs.id
  *   * _origin_row (int)
- *   * CONSTRAINT _origin_row (_origin_etl_job_id, _origin_row)
+ *   * CONSTRAINT UNIQUE _origin_row (_origin_etl_job_id, _origin_row)
  */
 abstract class DatabaseAgent
 {

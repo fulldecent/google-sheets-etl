@@ -9,8 +9,8 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class Tasks
 {
-    public /* GoogleSheetsAgent */ $googleSheetsAgent;
-    public /* DatabaseAgent */ $databaseAgent;
+    public GoogleSheetsAgent $googleSheetsAgent;
+    public DatabaseAgent $databaseAgent;
 
     /**
      * Example:

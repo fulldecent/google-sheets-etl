@@ -56,18 +56,16 @@ abstract class DatabaseAgent
 {
     /**
      * Schema prefix, like 'otherdatabase'
-     * @var ?string
      */
-    public $schema;
+    public ?string $schema;
 
     /**
      * Prefix for every table name, beware of maximum table name length
-     * @var ?string
      */
-    public $tablePrefix;
+    public ?string $tablePrefix;
 
-    protected /* \PDO */ $database;
-    protected /* ?string */ $loadTime;
+    protected \PDO $database;
+    protected int $loadTime;
 
     final public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
     {

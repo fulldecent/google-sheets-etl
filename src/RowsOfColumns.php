@@ -12,7 +12,7 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class RowsOfColumns
 {
-    private /* array */ $rowsOfColumns;
+    private array $rowsOfColumns;
 
     public function __construct(array $values)
     {

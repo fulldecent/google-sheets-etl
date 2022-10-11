@@ -9,10 +9,10 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class GoogleSheetsAgent
 {
-    private /* string */ $credentialsFile;
-    private /* \Google_Client */ $googleClient;
-    private /* float */ $loadTime;
-    private /* int */ $numberOfRequestsThisSession = 0;
+    private string $credentialsFile;
+    private \Google_Client $googleClient;
+    private float $loadTime;
+    private int $numberOfRequestsThisSession = 0;
 
     public function __construct(string $newCredentialsFile)
     {

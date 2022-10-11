@@ -13,7 +13,7 @@ class DatabaseAgentMysql extends DatabaseAgent
      * Beware max_allowed_packet errors
      * @var int
      */
-    public $sqlInsertChunkSize = 500;
+    public int $sqlInsertChunkSize = 500;
 
     public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
     public const ETL_JOBS_TABLE = '__meta_etl_jobs';

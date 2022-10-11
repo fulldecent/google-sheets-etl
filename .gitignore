@@ -14,3 +14,6 @@ composer.phar
 
 # Ant
 /build
+
+# Extra files
+/.phpunit.result.cache

@@ -323,11 +323,13 @@ SQL;
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
             $parameters = array_map(function ($v) {
-                return is_null($v)
-                    ? null
-                    : is_string($v)
-                        ? substr($v, 0, 100)
-                        : $v;
+                if (is_null($v)) {
+                    return null;
+                }
+                if (is_string($v)) {
+                    return substr($v, 0, 100);
+                }
+                return $v;
             }, $parameters);
             $statement->execute($parameters);
             echo '        loaded ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;

@@ -3,8 +3,7 @@
 Google Sheets ETL
 =================
 
-Live import all your Google Sheets to your data warehouse
-
+Import all your Google Sheets to your data warehouse, including periodic delta loads
 
 <img width="1993" alt="Screen Shot 2019-11-07 at 15 44 33" src="https://user-images.githubusercontent.com/382183/68426182-91f86d00-0175-11ea-8915-3ca3700488bd.png">
 
@@ -29,7 +28,7 @@ composer test
 
 ## Google Sheets limitations
 
-We have found several problems with using Google Sheets as a database, even though we will continue to use it:
+We found several problems with using Google Sheets as a database, even though we continue to use it:
 
 - Cannot restrict editing the first row (headers) to certain people
   - If you try protecting the cells it will prevent everyone from using a filter which is unacceptable
@@ -42,7 +41,7 @@ We have found several problems with using Google Sheets as a database, even thou
 - Cannot enforce a unique column
   - Creating a custom data validation formula is cumbersome and not reliable, plus other collaborators can defeat it
 - Cannot create a sheet-level comment to document the purpose of the whole sheet 
-- Filters cannot be used, because by default they will prevent all other workers from seeking rows that they want
+- Filters cannot be used, because they hide rows for everybody
   - If using another mode "filter views", which is harder to find, it will create hundreds of saved "Filter 1", "Filter 2" ... files.
 
 ## References

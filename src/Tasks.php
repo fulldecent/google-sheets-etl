@@ -13,20 +13,9 @@ class Tasks
     public DatabaseAgent $databaseAgent;
 
     /**
-     * Example:
-     * {
-     *     "$schema": "./config-schema.json",
-     *     "1b39RL2nQJxdhHYxVmkk4lo3K1IKjSD3_ggnokrZCkx8": {
-     *         "2019 Expirations": {
-     *             "targetTable": "certification-course-renewals-2019",
-     *             "columnMapping": {"out1": "in1", "out2": 2},
-     *             "headerRow": 0,
-     *             "skipRows": 1
-     *         }
-     *     }
-     * }
+     * @var array<EtlConfig>
      */
-    private /* array */ $configurationForSpreadsheetSheet;
+    public array $etlConfig = [];
 
     public function __construct(string $credentialsFile, \PDO $database)
     {
@@ -34,139 +23,113 @@ class Tasks
         $this->databaseAgent = DatabaseAgent::agentForPdo($database);
     }
 
-    public function setConfiguration(\stdClass $configuration)
+    public function loadConfiguration(string $file): void
     {
-        foreach ($configuration as $googleSpreadsheetId => $spreadsheetConfiguration) {
-            if ($googleSpreadsheetId == '$schema') {
-                continue;
-            }
-            foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
-                $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName] = (object)[
-                    'targetTable' => $configuration->targetTable, # Required property
-                    'columnMapping' => (array)($configuration->columnMapping), # Optional
-                    'headerRow' => $configuration->headerRow ?? 0, # Optional
-                    'skipRows' => $configuration->skipRows ?? 1 # Optional
-                ];
-            }
-        }
+        $this->etlConfig = EtlConfig::fromFile($file);
     }
 
     /**
-     * Load one sheet to database
-     *
-     * @implNote: Potential improvement: reduce transaction locking time by
-     *            using a temporary table to stage incoming data.
-     *
-     * @param string $googleSpreadsheetId
-     * @param string $sheetName
-     * @param string $googleModified
-     * @return void
+     * Find and account for some updated spreadsheets
      */
-    public function loadSheet(
-        string $googleSpreadsheetId,
-        string $sheetName,
-        string $googleModified,
-        string $googleSpreadsheetName
-    ) {
-        echo '  Loading spreadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
-        $configuration = $this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName];
-        $targetTable = $configuration->targetTable;
-
-        echo '    Getting sheet rows';
-        $rowsOfColumns = $this->googleSheetsAgent->getSheetRows($googleSpreadsheetId, $sheetName);
-        echo '    Selecting columns';
-        try {
-            $selectors = $rowsOfColumns->getColumnSelectorsFromHeaderRow(
-                $configuration->columnMapping,
-                $configuration->headerRow
-            );
-        } catch (\Exception $exception) {
-            throw new \Exception(
-                'With spreadsheet https://docs.google.com/spreadsheets/d/' .
-                $googleSpreadsheetId .
-                "\nWith sheet $sheetName\n" .
-                $exception->getMessage()
-            );
-        }
-        echo '     Loading';
-        $headers = array_keys($configuration->columnMapping);
-        try {
-            $dataRows = $rowsOfColumns->getRows($selectors, $configuration->skipRows);
-            $this->databaseAgent->accountSpreadsheetSeen($googleSpreadsheetId, $googleModified, $googleSpreadsheetName);
-            $this->databaseAgent->loadAndAccountSheet(
-                $googleSpreadsheetId,
-                $sheetName,
-                $targetTable,
-                $googleModified,
-                $headers,
-                $dataRows
-            );
-        } catch (\Exception $exception) {
-            throw new \Exception(
-                'With spreadsheet https://docs.google.com/spreadsheets/d/' .
-                $googleSpreadsheetId .
-                "\nWith sheet $sheetName\n" .
-                $exception->getMessage()
-            );
-        }
-    }
-
-    /**
-     * Inhale new sheets from spreadsheet to database, overwriting any existing
-     * loaded data
-     *
-     * Prerequisite: have already run accountSpreadsheetSeen
-     *
-     * @param string $googleSpreadsheetId Google spreadesheet ID
-     * @param string $googleModified RFC 3339 modified time
-     * @return void
-     */
-    public function loadSpreadsheet(string $googleSpreadsheetId, string $googleModified, string $googleSpreadsheetName)
+    public function findSomeUpdatedSpreadsheets()
     {
-        echo 'Loading spreadsheetId ' . $googleSpreadsheetId . ' modified ' . $googleModified . PHP_EOL;
-        /*
-        $sheetsToLoad = $this->googleSheetsAgent->getGridSheetTitles($googleSpreadsheetId);
-        foreach ($sheetsToLoad as $sheetName) {
-            if (!isset($this->configurationForSpreadsheetSheet[$googleSpreadsheetId][$sheetName])) {
-                echo 'Skipping speadsheetId ' . $googleSpreadsheetId . ' sheet ' . $sheetName . PHP_EOL;
-                continue;
-            }
-            $this->loadSheet($googleSpreadsheetId, $sheetName, $googleModified);
-        }
-        */
-        foreach ($this->configurationForSpreadsheetSheet[$googleSpreadsheetId] as $sheetName => $configuration) {
-            $etlJob = $this->databaseAgent->getEtl($googleSpreadsheetId, (string)$sheetName);
-            if (!is_null($etlJob) && $etlJob->loaded_google_modified === $etlJob->latest_google_modified) {
-                continue; // Skip, already loaded this sheet version
-            }
-            $this->loadSheet($googleSpreadsheetId, (string)$sheetName, $googleModified, $googleSpreadsheetName);
-        }
-    }
-
-    /**
-     * Load some spreadsheets that were not completely loaded already
-     */
-    public function loadSomeNewerSpreadsheets()
-    {
-        $lastModified = '2001-01-01T00:00:00Z'; // Before Google Drive started
-        $googleSpreadsheetId = ''; // The lexically lowest spreadsheet ID
-        $result = $this->databaseAgent->getGreatestModifiedAndIdLoaded();
+        $lastModified = '2001-01-01T00:00:00Z'; // A time before Google Drive started
+        $highestSpreadsheetIdLoadedAtThatTime = '';
+        $result = $this->databaseAgent->getGreatestModified();
         if (!is_null($result)) {
-            list($lastModified, $googleSpreadsheetId) = $result;
+            list($lastModified, $highestSpreadsheetIdLoadedAtThatTime) = $result;
         }
-        echo 'Prior ETL is synchronized up to: ' . $lastModified . PHP_EOL . PHP_EOL;
-        $someNewSpreadsheets = $this->googleSheetsAgent->getOldestSpreadsheets($lastModified, $googleSpreadsheetId);
-        foreach ($someNewSpreadsheets as $googleSpreadsheetId => $spreadsheet) {
-            $this->databaseAgent->accountSpreadsheetSeen(
+        echo 'Previously found spreadsheets updated up to: ' . $lastModified . PHP_EOL . PHP_EOL;
+        $someUpdatedSpreadsheets = $this->googleSheetsAgent->getOldestSpreadsheets(
+            $lastModified,
+            $highestSpreadsheetIdLoadedAtThatTime,
+            200,
+        );
+        foreach ($someUpdatedSpreadsheets as $googleSpreadsheetId => $spreadsheet) {
+            $this->databaseAgent->setSpreadsheetSeen(
                 $googleSpreadsheetId,
                 $spreadsheet->modifiedTime,
                 $spreadsheet->name
             );
-            if (!isset($this->configurationForSpreadsheetSheet[$googleSpreadsheetId])) {
-                echo 'Skipping speadsheetId ' . $googleSpreadsheetId . PHP_EOL;
-                continue;
-            }
-            $this->loadSpreadsheet($googleSpreadsheetId, $spreadsheet->modifiedTime, $spreadsheet->name);
+            echo "Found new spreadsheet $googleSpreadsheetId $spreadsheet->name" . PHP_EOL;
+        }
+    }
+
+    public function loadSomeUpdatedSpreadsheets()
+    {
+        $loadableEtlConfigs = $this->databaseAgent->filterExtractable($this->etlConfig);
+        foreach ($loadableEtlConfigs as $etlConfig) {
+            $this->loadSheet($etlConfig);
+        }
+    }
+
+    /**
+     * Check and re-account for the spreadsheet not seen for the longest time
+     * @return bool True if still accessible or no spreadsheets ever seen, false otherwise
+     */
+    public function verifyOldestSpreadsheet(): bool
+    {
+        $oldestSeen = $this->databaseAgent->getOldestSeen();
+        if (is_null($oldestSeen)) {
+            echo 'No spreadsheets ever seen' . PHP_EOL;
+            return true;
+        }
+        $spreadsheet = $this->googleSheetsAgent->getSpreadsheet($oldestSeen);
+        if (is_null($spreadsheet)) {
+            echo "Oldest spreadsheet $oldestSeen is no longer accessible" . PHP_EOL;
+            return false;
+        }
+        $this->databaseAgent->setSpreadsheetSeen(
+            $oldestSeen,
+            $spreadsheet->modifiedTime,
+            $spreadsheet->name
+        );
+        echo "Oldest spreadsheet $oldestSeen is still accessible" . PHP_EOL;
+        return true;
+    }
+
+    /**
+     * Extract data from Google Sheets and update accounting
+     */
+    private function loadSheet(EtlConfig $etlConfig): void
+    {
+        echo '  Extracting ' . $etlConfig->googleSpreadsheetId . ' ' . $etlConfig->googleSheetName . PHP_EOL;
+        $sheetRows = $this->googleSheetsAgent->getSheetRows(
+            $etlConfig->googleSpreadsheetId,
+            $etlConfig->googleSheetName,
+        );
+        echo '    Transforming columns';
+        try {
+            $selectors = $sheetRows->getColumnSelectorsFromHeaderRow(
+                $etlConfig->columnMapping,
+                $etlConfig->headerRow,
+            );
+        } catch (\Exception $exception) {
+            throw new \Exception(
+                "Load failed for\n" .
+                'Spreadsheet https://docs.google.com/spreadsheets/d/' . $etlConfig->googleSpreadsheetId . "\n" .
+                'Sheet ' . $etlConfig->sheetName . "\n" .
+                'Missing column ' . $exception->getMessage()
+            );
+        }
+        echo '     Loading';
+        $columnNames = array_keys($configuration->columnMapping);
+        try {
+            $dataRows = $sheetRows->getRows($selectors, $configuration->skipRows);
+            $this->databaseAgent->loadSheet(
+                $googleSpreadsheetId,
+                $sheetName,
+                $targetTable,
+                $columnNames,
+                $dataRows,
+                $sheetRows->hash,
+            );
+        } catch (\Exception $exception) {
+            throw new \Exception(
+                "Load failed for\n" .
+                'Spreadsheet" https://docs.google.com/spreadsheets/d/' . $etlConfig->googleSpreadsheetId . "\n" .
+                $exception->getMessage()
+            );
         }
     }
 }

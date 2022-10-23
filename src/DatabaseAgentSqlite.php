@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A data store and accounting for putting CSV files into a PDO database
+ * A data store and accounting for spreadsheets in a Sqlite database
  */
 class DatabaseAgentSqlite extends DatabaseAgent
 {
@@ -22,27 +22,15 @@ class DatabaseAgentSqlite extends DatabaseAgent
     public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
     public const ETL_JOBS_TABLE = '__meta_etl_jobs';
 
-    // Getters /////////////////////////////////////////////////////////////////
+    // Getters /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * For all spreadsheets which are partially or fully loaded, get the one
-     * with the greatest lexical order of (google_modified,
-     * google_spreadsheet_id), or null if no spreadsheets are loaded
-     *
-     * @see https://tools.ietf.org/html/rfc3339
-     *
-     * @return array like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
-     */
-    public function getGreatestModifiedAndIdLoaded(): ?array
+    /// @inheritdoc
+    public function getGreatestModified(): ?array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-        $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
         $sql = <<<SQL
 SELECT a.google_modified, a.google_spreadsheet_id
   FROM $quotedSpreadsheetsTable a
-  JOIN $quotedEtlJobsTable b
-    ON b.spreadsheet_id = a.id
- WHERE b.google_modified = a.google_modified
  ORDER BY a.google_modified DESC, a.google_spreadsheet_id DESC
  LIMIT 1
 SQL;
@@ -50,95 +38,62 @@ SQL;
         return $row === false ? null : $row;
     }
 
-    /**
-     * For all spreadsheets seen on or after the given date, get the greatest
-     * Google spreadsheet ID
-     *
-     * @param integer $since a Unix timestamp
-     * @return string|null
-     */
-    public function getGreatestIdSeenSince(int $since): ?string
+    /// @inheritdoc
+    public function getOldestSeen(): ?string
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<SQL
-SELECT google_spreadsheet_id
-  FROM $quotedSpreadsheetsTable
- WHERE last_seen >= ?
- ORDER BY google_spreadsheet_id DESC
+SELECT a.google_spreadsheet_id
+  FROM $quotedSpreadsheetsTable a
+ ORDER BY a.last_seen
  LIMIT 1
 SQL;
-        $query = $this->database->prepare($sql);
-        $query->execute([$since]);
-        $result = $query->fetchColumn();
-        return $result === false ? null : $result;
+        $column = $this->database->query($sql)->fetchColumn();
+        return $column === false ? null : $column;
     }
 
-    /**
-     * Get all spreadsheets which were not seen after the given time
-     *
-     * @param integer $since  a Unix timestamp
-     * @param integer $limit  limit a maximum quantity of results to return
-     * @return array          Google spreadsheet IDs in order starting with the
-     *                        least and including up to LIMIT number of rows
-     */
-    public function getIdsNotSeenSince(int $since, int $limit): array
-    {
-        $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-        $sql = <<<SQL
-SELECT google_spreadsheet_id
-  FROM $quotedSpreadsheetsTable
- WHERE last_seen < ?
- ORDER BY google_spreadsheet_id
- LIMIT $limit
-SQL;
-        $query = $this->database->prepare($sql);
-        $query->execute([$since]);
-        return $query->fetchColumn();
-    }
-
-    /**
-     * Get ETL details for a specific spreadsheet and sheet
-     *
-     * @param string $googleSpreadsheetId  specified Google spreadsheet ID
-     * @param string $sheetName            specified sheet name
-     * @return \stdClass|null              ETL information
-     */
-    public function getEtl(string $googleSpreadsheetId, string $sheetName): ?\stdClass
+    /// @inheritdoc
+    public function filterExtractable(array $jobs): array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
+        $quotedIn = '("NONE", "NONE")'; // sqlite doesn't like empty IN
+        $params = [];
+        foreach ($jobs as $job) {
+            $quotedIn .= ', (?, ?)';
+            $params[] = $job->googleSpreadsheetId;
+            $params[] = $job->sheetName;
+        }
 
-        $getAccountingSql = <<<SQL
-SELECT etl_jobs.id
-     , etl_jobs.sheet_name
-     , etl_jobs.target_table
-     , etl_jobs.google_modified loaded_google_modified
-     , spreadsheets.google_spreadsheet_id
-     , spreadsheets.google_modified latest_google_modified
-     , spreadsheets.last_seen
-  FROM $quotedEtlJobsTable etl_jobs
-  JOIN $quotedSpreadsheetsTable spreadsheets
-    ON spreadsheets.id = etl_jobs.spreadsheet_id
- WHERE google_spreadsheet_id = :google_spreadsheet_id
-   AND sheet_name = :sheet_name
+        $sql = <<<SQL
+SELECT a.google_spreadsheet_id
+  FROM $quotedSpreadsheetsTable a
+  LEFT JOIN $quotedEtlJobsTable b
+    ON b.spreadsheet_id = a.google_spreadsheet_id
+ WHERE (a.google_spreadsheet_id, a.google_spreadsheet_name) IN ($quotedJobs)
+   AND (b.google_modified IS NULL OR a.google_modified > b.google_modified)
 SQL;
-        $statement = $this->database->prepare($getAccountingSql);
-        $statement->execute([
-            'google_spreadsheet_id' => $googleSpreadsheetId,
-            'sheet_name' => $sheetName,
-        ]);
-        $retval = $statement->fetch(\PDO::FETCH_OBJ);
-        return $retval === false ? null : $retval;
+        $statement = $this->database->prepare($sql);
+        $statement->execute($params);
+        $rows = $statement->fetchAll(\PDO::FETCH_NUM);
+        $updatedSpreadsheetIdsAndSheetNames = [];
+        foreach ($rows as $row) {
+            $updatedSpreadsheetIdsAndSheetNames[$row[0]][$row[1]] = true;
+        }
+
+        $extractable = [];
+        foreach ($jobs as $job) {
+            if (isset($updatedSpreadsheetIdsAndSheetNames[$job->googleSpreadsheetId][$job->sheetName])) {
+                $extractable[] = $job;
+            }
+        }
+        return $extractable;
     }
 
-    // Accounting //////////////////////////////////////////////////////////////
+    // Setters /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * The accounting must be set up before any other methods are called
-     *
-     * @apiSpec Calling this method twice shall not cause data loss or error.
-     */
-    public function setUpAccounting()
+    /// @inheritdoc
+    public function setUpAccounting(): void
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
@@ -160,8 +115,9 @@ CREATE TABLE IF NOT EXISTS $quotedEtlJobsTable (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     spreadsheet_id INT NOT NULL,
     sheet_name VARCHAR(99) NOT NULL,
-    target_table VARCHAR(99),
+    target_table VARCHAR(99) NOT NULL,
     google_modified VARCHAR(99) NOT NULL,
+    raw_columns_rows_hash VARCHAR(99) NOT NULL,
     CONSTRAINT sheet_name UNIQUE (spreadsheet_id, sheet_name),
     FOREIGN KEY (spreadsheet_id)
         REFERENCES $quotedSpreadsheetsTable(id)
@@ -170,62 +126,192 @@ SQL;
         $this->database->exec($sql);
     }
 
-    /**
-     * Account that a spreadsheet is seen, this confirms we have access
-     */
-    public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name)
+    /// @inheritdoc
+    public function setSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name): void
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $sql = <<<SQL
-INSERT OR IGNORE INTO $quotedSpreadsheetsTable
+INSERT INTO $quotedSpreadsheetsTable
 (google_spreadsheet_id, google_modified, google_spreadsheet_name, last_seen)
 VALUES
 (:google_spreadsheet_id, :google_modified, :google_spreadsheet_name, :last_seen)
+    ON CONFLICT(google_spreadsheet_id)
+    DO UPDATE SET
+           google_modified = :google_modified,
+           google_spreadsheet_name = :google_spreadsheet_name,
+           last_seen = :last_seen
 SQL;
+echo $sql;
         $this->database->prepare($sql)->execute([
             'google_spreadsheet_id'=>$googleSpreadsheetId,
             'google_modified'=>$googleModified,
             'google_spreadsheet_name'=>$name,
-            'last_seen'=>$this->loadTime
-        ]);
-        $sql = <<<SQL
-UPDATE $quotedSpreadsheetsTable
-   SET google_modified = :google_modified
-     , google_spreadsheet_name = :google_spreadsheet_name
-     , last_seen = :last_seen
- WHERE google_spreadsheet_id = :google_spreadsheet_id
-SQL;
-        $this->database->prepare($sql)->execute([
-            'google_spreadsheet_id'=>$googleSpreadsheetId,
-            'google_modified'=>$googleModified,
-            'google_spreadsheet_name'=>$name,
-            'last_seen'=>$this->loadTime
+            'last_seen'=>$this->loadTime,
         ]);
     }
 
-    // Data store //////////////////////////////////////////////////////////////
-
-    /**
-     * Removes sheet and accounting, if exists, and load and account for sheet
-     *
-     * @implNote: This could reduce the transaction locking time by using a
-     *            temporary table to stage incoming data.
-     * @apiSpec This operation shall be atomic, no partial effect may occur on
-     *          the database if program is prematurely exited.
-     */
-    public function loadAndAccountSheet(
+    /// @inheritdoc
+    public function loadSheet(
         string $googleSpreadsheetId,
         string $sheetName,
         string $targetTable,
-        string $googleModified,
         array $columnNames,
-        array $rows
-    ) {
+        array $rows,
+        string $hash,
+    ): void
+    {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
 
-        // Create table ////////////////////////////////////////////////////////
+        // Create table
         echo '    Creating table';
+        $this->createTable($targetTable, $columnNames);
+
+        $this->database->beginTransaction(); // the CREATE/UPDATE above are implicit-commit statements
+
+        // Update accounting
+        $getHashSql = <<<SQL
+SELECT etl_jobs.raw_columns_rows_hash
+  FROM $quotedEtlJobsTable etl_jobs
+  JOIN $quotedSpreadsheetsTable spreadsheets
+    ON spreadsheets.id = etl_jobs.spreadsheet_id
+ WHERE google_spreadsheet_id = :google_spreadsheet_id
+   AND sheet_name = :sheet_name
+SQL;
+        $statement = $this->database->prepare($getHashSql);
+        $statement->execute([
+            'google_spreadsheet_id' => $googleSpreadsheetId,
+            'sheet_name' => $sheetName,
+        ]);
+        $existingHash = $statement->fetchColumn();
+        if ($existingHash === $hash) {
+            echo '    No change in data, skipping load';
+            $this->database->commit();
+            return;
+        }
+
+        $upsertAccountingSql = <<<SQL
+INSERT INTO $quotedEtlJobsTable
+(spreadsheet_id, sheet_name, target_table, google_modified, raw_columns_rows_hash)
+SELECT spreadsheets.id, :sheet_name, :target_table, :google_modified, :raw_columns_rows_hash
+  FROM $quotedSpreadsheetsTable spreadsheets
+ WHERE google_spreadsheet_id = :google_spreadsheet_id
+    ON CONFLICT(spreadsheet_id, sheet_name)
+    DO UPDATE SET
+           target_table = :target_table,
+           google_modified = :google_modified,
+           raw_columns_rows_hash = :raw_columns_rows_hash
+SQL;
+        $statement = $this->database->prepare($upsertAccountingSql);
+        $statement->execute([
+            'google_spreadsheet_id' => $googleSpreadsheetId,
+            'sheet_name' => $sheetName,
+            'target_table' => $targetTable,
+            'google_modified' => $this->loadTime,
+            'raw_columns_rows_hash' => $hash,
+        ]);
+
+        $getEtlJobIdSql = <<<SQL
+SELECT id
+  FROM $quotedEtlJobsTable
+  JOIN $quotedSpreadsheetsTable
+    ON spreadsheets.id = etl_jobs.spreadsheet_id
+ WHERE google_spreadsheet_id = :google_spreadsheet_id
+   AND sheet_name = :sheet_name
+SQL;
+        $etlJobId = $this->database->prepare($getEtlJobIdSql)->execute([
+            'google_spreadsheet_id' => $googleSpreadsheetId,
+            'sheet_name' => $sheetName,
+        ])->fetchColumn();
+        assert($etlJobId !== false);
+
+        // Delete existing rows
+        echo '    Deleting existing rows';
+        $deleteSql = <<<SQL
+DELETE FROM $quotedTargetTable
+ WHERE _origin_etl_job_id = ?
+SQL;
+        $this->database->prepare($deleteSql)->execute([$etlJobId]);
+
+        // Insert rows
+        echo '    Inserting rows';
+        $quotedColumns = implode(',', array_merge(['_origin_etl_job_id', '_origin_row'], $normalizedQuotedColumnNames));
+        $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
+        $sqlOneValueList = implode(',', array_fill(0, count($columnNames) + 2, '?'));
+        // Load each row for the selected columns
+        foreach (array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
+            $parameters = [];
+            foreach ($rowChunk as $i => $row) {
+                array_push($parameters, $etlJobId, $i, ...$row);
+            }
+            $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
+            $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
+            $parameters = array_map(function ($v) {
+                if (is_null($v)) {
+                    return null;
+                }
+                if (is_string($v)) {
+                    return substr($v, 0, 100);
+                }
+                return $v;
+            }, $parameters);
+            $statement->execute($parameters);
+            echo '        ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
+        }
+
+        // All done
+        $this->database->commit();        
+    }
+
+    // Private /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Use SCHEMA and PREFIX to generate table name.
+     *
+     * @implNote WARNING, this can make names that are too long for the database.
+     *
+     * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
+     *
+     * @param string $unqualifiedName
+     * @return string
+     */
+    private function quotedFullyQualifiedTableName(string $unqualifiedName): string
+    {
+        $qualifiedTableName = ($this->tablePrefix ?? '') . $unqualifiedName;
+        return ($this->schema ?? '') . "`$qualifiedTableName`";
+    }
+
+    /**
+     * Turns the columns into unique names of the format which MySQL and SQLite allow as ASCII quoted identifiers
+     *
+     * @implNote: This will break if a column is named _rowid_
+     *
+     * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html identifiers.
+     *
+     * @param array $columns
+     * @return array The new column names
+     */
+    private function normalizedQuotedColumnNames(array $columns): array
+    {
+        $retval = [];
+        foreach ($columns as $index => $column) {
+            $column = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
+            $column = strtolower($column);
+            $column = preg_replace('/[^a-z0-9_ ]/', '', $column);
+            $column = trim($column);
+            if (!preg_match('/^[a-z_]/', $column)) {
+                $column = '_' . $column;
+            }
+            if (preg_match('/^col_[0-9]+$/', $column) || empty($column) || in_array($column, $retval)) {
+                $column = 'col_' . ($index + 1);
+            }
+            array_push($retval, '`' . $column . '`');
+        }
+        return $retval;
+    }
+
+    private function createTable($targetTable, $columnNames): void
+    {
         $quotedTargetTable = $this->quotedFullyQualifiedTableName($targetTable);
         $normalizedQuotedColumnNames = $this->normalizedQuotedColumnNames($columnNames);
         $createTableSql = <<<SQL
@@ -249,143 +335,5 @@ SQL;
                 // Ignore if column already exists
             }
         }
-
-        $this->database->beginTransaction(); // the CREATE/UPDATE above are implicit-commit statements
-
-        // Update accounting ///////////////////////////////////////////////////
-        $insertAccountingSql = <<<SQL
-INSERT OR IGNORE INTO $quotedEtlJobsTable (
-           spreadsheet_id,
-           sheet_name,
-           target_table,
-           google_modified
-       )
-SELECT id, :sheet_name, :target_table, :google_modified
-  FROM $quotedSpreadsheetsTable
- WHERE google_spreadsheet_id = :google_spreadsheet_id
-SQL;
-        $this->database->prepare($insertAccountingSql)->execute([
-            'google_spreadsheet_id' => $googleSpreadsheetId,
-            'sheet_name' => $sheetName,
-            'target_table' => $targetTable,
-            'google_modified' => $googleModified
-        ]);
-        $updateAccountingSql = <<<SQL
-UPDATE $quotedEtlJobsTable
-   SET target_table = :target_table
-     , google_modified = :google_modified
- WHERE spreadsheet_id = (SELECT id FROM $quotedSpreadsheetsTable WHERE google_spreadsheet_id = :google_spreadsheet_id)
-   AND sheet_name = :sheet_name
-SQL;
-        $this->database->prepare($updateAccountingSql)->execute([
-            'google_spreadsheet_id' => $googleSpreadsheetId,
-            'sheet_name' => $sheetName,
-            'target_table' => $targetTable,
-            'google_modified' => $googleModified
-        ]);
-        $getAccountingSql = <<<SQL
-SELECT etl_jobs.id
-  FROM $quotedEtlJobsTable etl_jobs
-  JOIN $quotedSpreadsheetsTable spreadsheets
-    ON spreadsheets.id = etl_jobs.spreadsheet_id
- WHERE google_spreadsheet_id = :google_spreadsheet_id
-   AND sheet_name = :sheet_name
-   AND target_table = :target_table
-SQL;
-        $statement = $this->database->prepare($getAccountingSql);
-        $statement->execute([
-            'google_spreadsheet_id' => $googleSpreadsheetId,
-            'sheet_name' => $sheetName,
-            'target_table' => $targetTable
-        ]);
-        $etlJobId = $statement->fetchColumn();
-        assert($etlJobId !== false);
-
-        // Delete rows /////////////////////////////////////////////////////////
-        echo '    Deleting rows';
-        $deleteSql = <<<SQL
-DELETE FROM $quotedTargetTable
- WHERE _origin_etl_job_id = ?
-SQL;
-        $this->database->prepare($deleteSql)->execute([$etlJobId]);
-
-        // Insert rows /////////////////////////////////////////////////////////
-        echo '    Inserting rows';
-        $quotedColumns = implode(',', array_merge(['_origin_etl_job_id', '_origin_row'], $normalizedQuotedColumnNames));
-        $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
-        $sqlOneValueList = implode(',', array_fill(0, count($columnNames) + 2, '?'));
-        // Load each row for the selected columns
-        foreach (array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
-            $parameters = [];
-            foreach ($rowChunk as $i => $row) {
-                array_push($parameters, $etlJobId, $i, ...$row);
-            }
-            $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
-            $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
-            $parameters = array_map(function ($v) {
-                if (is_null($v)) {
-                    return null;
-                }
-                if (is_string($v)) {
-                    return substr($v, 0, 100);
-                }
-                return $v;
-            }, $parameters);
-            $statement->execute($parameters);
-            echo '        loaded ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
-        }
-
-        // All done
-        $this->database->commit();
-    }
-
-    // PRIVATE /////////////////////////////////////////////////////////////////
-
-    /**
-     * Use SCHEMA and PREFIX to generate table name.
-     *
-     * @implNote WARNING, this can make names that are too long for
-     *           the database.
-     *
-     * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
-     *
-     * @param string $unqualifiedName
-     * @return string
-     */
-    private function quotedFullyQualifiedTableName(string $unqualifiedName): string
-    {
-        $qualifiedTableName = ($this->tablePrefix ?? '') . $unqualifiedName;
-        return ($this->schema ?? '') . "`$qualifiedTableName`";
-    }
-
-    /**
-     * Turns the columns into unique names of the format which MySQL and SQLite
-     * allow as ASCII quoted identifiers
-     *
-     * @implNote: This will break if a column is named _rowid_
-     *
-     * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
-     * identifiers.
-     *
-     * @param array $columns
-     * @return array The new column names
-     */
-    private function normalizedQuotedColumnNames(array $columns): array
-    {
-        $retval = [];
-        foreach ($columns as $index => $column) {
-            $column = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
-            $column = strtolower($column);
-            $column = preg_replace('/[^a-z0-9_ ]/', '', $column);
-            $column = trim($column);
-            if (!preg_match('/^[a-z_]/', $column)) {
-                $column = '_' . $column;
-            }
-            if (preg_match('/^col_[0-9]+$/', $column) || empty($column) || in_array($column, $retval)) {
-                $column = 'col_' . ($index + 1);
-            }
-            array_push($retval, '`' . $column . '`');
-        }
-        return $retval;
     }
 }

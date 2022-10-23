@@ -13,8 +13,9 @@ namespace fulldecent\GoogleSheetsEtl;
 class RowsOfColumns
 {
     private array $rowsOfColumns;
+    public string $hash;
 
-    public function __construct(array $values)
+    public function __construct(array $values, string $hash)
     {
         $temp = [];
         foreach ($values as $rowIndex => $columns) {
@@ -23,14 +24,15 @@ class RowsOfColumns
             }
         }
         $this->rowsOfColumns = $temp;
+        $this->hash = $hash;
     }
 
     /**
      * Gets column selectors for the specified names from a header row
      *
-     * @param array   $specifiers  indicies (zero-indexed) or names of columns
-     * @param integer $headerRow   which row (zero-indexed) to retrieve from
-     * @return array               columns (zero-indexed) for names specified
+     * @param array   $specifiers indicies (zero-indexed) or names of columns
+     * @param integer $headerRow  which row (zero-indexed) to retrieve from
+     * @return array              columns (zero-indexed) for names specified
      */
     public function getColumnSelectorsFromHeaderRow(array $specifiers, int $headerRow = 0): array
     {
@@ -60,11 +62,10 @@ class RowsOfColumns
     /**
      * Return a two-dimensional array of values
      *
-     * @param array   $columnSelectors  specifyies which columns (zero-indexed)
-     *                                  to extract from each row of source data
-     * @param integer $skipRows         number of rows to skip from source data
-     * @return array                    rows, each containing an array (columns)
-     *                                  of values
+     * @param array   $columnSelectors specifyies which columns (zero-indexed)
+     *                                 to extract from each row of source data
+     * @param integer $skipRows        number of rows to skip from source data
+     * @return array                   rows, each containing an array (columns) of values
      */
     public function getRows(array $columnSelectors, int $skipRows = 1): array
     {

@@ -13,44 +13,40 @@ use stdClass;
  *
  * You can imagine accounting is approximately:
  *
- * TABLE spreadsheets
- *   * id (int) PRIMARY KEY
- *     * Key
- *     * Databases require an increasing value to make INSERTs fast
- *   * google_spreadsheet_id (string |^[a-zA-Z0-9-_]{44}$|i) (UNIQUE)
- *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
- *     * https://developers.google.com/sheets/api/guides/concepts
- *     * The allowable set of spreadsheetids is currently undefined behavior per Google API documentation (issue
- *       reported)
- *     * This regex is an estimate
- *   * google_spreadsheet_name (string)
- *     * https://stackoverflow.com/questions/62050607/what-is-a-string-in-the-google-drive-api
- *   * google_modified (string, RFC 3339 date-time)
- *     * https://developers.google.com/drive/api/v3/reference/files
- *   * last_seen (int)
- *     * Unix timestamp, system time
- *     * This is the last time we confirmed access to this file, a very old time may indicate we no longer have access
- *       or the file was deleted
+ * - spreadsheets (spreadsheets confirmed to be accessible)
+ *   - id (int) PRIMARY KEY
+ *     - Databases require an increasing value to make INSERTs fast
+ *   - google_spreadsheet_id (string) UNIQUE
+ *     - Format is probably |^[a-zA-Z0-9-_]{44}$|i, but that's not documented
+ *     - https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets
+ *     - https://developers.google.com/sheets/api/guides/concepts
+ *   - google_spreadsheet_name (string)
+ *     - https://stackoverflow.com/questions/62050607/what-is-a-string-in-the-google-drive-api
+ *   - google_modified (string, RFC 3339 date-time)
+ *     - https://developers.google.com/drive/api/v3/reference/files
+ *   - last_seen (int)
+ *     - Unix timestamp, system time
+ *     - This is the last time we confirmed access to this file
  *
- * TABLE etl_jobs
- *   * id (int) PRIMARY KEY
- *     * Key
- *     * Databases require an increasing value to make INSERTs fast
- *   * spreadsheet_id FOREIGN KEY spreadsheets.id
- *   * sheet_name (string)
- *     * https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties
- *     * The allowable set of sheet names is currently undefined behavior per Google API documentation (issue reported)
- *   * target_table (string)
- *     * Pointer to the table where this sheet is stored in the data store
- *   * google_modified
- *     * Matches spreadsheets.google_modified when loaded
- *   * CONSTRAINT UNIQUE sheet_name (spreadsheet_id, sheet_name)
+ * - etl_jobs
+ *   - id (int) PRIMARY KEY
+ *     - Databases require an increasing value to make INSERTs fast
+ *   - spreadsheet_id FOREIGN KEY spreadsheets.id
+ *   - sheet_name (string)
+ *     - Google does not define the maximum length of a sheet name
+ *     - https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets#SheetProperties
+ *   - target_table (string)
+ *     - Pointer to the table where this sheet is stored in the data store
+ *   - google_modified
+ *     - Matches spreadsheets.google_modified when loaded
+ *   - raw_columns_rows_hash (string)
+ *     - SHA256 hash of JSON string of the columns and rows loaded
+ *   - CONSTRAINT UNIQUE sheet_name (spreadsheet_id, sheet_name)
  *
- * TABLE target_table (this will have various names)
- *   * _rowid (int) PRIMARY KEY
- *   * _origin_etl_job_id FOREIGN KEY etl_jobs.id
- *   * _origin_row (int)
- *   * CONSTRAINT UNIQUE _origin_row (_origin_etl_job_id, _origin_row)
+ * - target_table (this will have various names)
+ *   - _origin_etl_job_id FOREIGN KEY etl_jobs.id
+ *   - _origin_row (int)
+ *   - CONSTRAINT UNIQUE _origin_row (_origin_etl_job_id, _origin_row)
  */
 abstract class DatabaseAgent
 {
@@ -65,6 +61,10 @@ abstract class DatabaseAgent
     public ?string $tablePrefix;
 
     protected \PDO $database;
+
+    /** 
+     * The time this script was started
+     */
     protected int $loadTime;
 
     final public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
@@ -89,80 +89,58 @@ abstract class DatabaseAgent
     // Getters /////////////////////////////////////////////////////////////////
 
     /**
-     * @return int The time this script loaded
-     */
-    final public function getLoadTime(): int
-    {
-        return $this->loadTime;
-    }
-
-    /**
-     * For all spreadsheets which are partially or fully loaded, get the one
-     * with the greatest lexical order of (google_modified,
-     * google_spreadsheet_id), or null if no spreadsheets are loaded
+     * For all spreadsheets which were confirmed accessible, get the one with the greatest lexical order of
+     * (google_modified, google_spreadsheet_id), or null if no spreadsheets were seen
      *
      * @see https://tools.ietf.org/html/rfc3339
      *
-     * @return array like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
+     * @return ?array like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
      */
-    abstract public function getGreatestModifiedAndIdLoaded(): ?array;
+    abstract public function getGreatestModified(): ?array;
 
     /**
-     * For all spreadsheets seen on or after the given date, get the greatest
-     * Google spreadsheet ID
+     * For all spreadsheets which were confirmed accessible, get the one that was confirmed the longest ago, or null if
+     * no spreadsheets were seen
      *
-     * @param integer $since a Unix timestamp
-     * @return string|null
+     * @return ?string The google_spreadsheet_id of the oldest-seen spreadsheet
      */
-    abstract public function getGreatestIdSeenSince(int $since): ?string;
+    abstract public function getOldestSeen(): ?string;
 
     /**
-     * Get all spreadsheets which were not seen after the given time
-     *
-     * @param integer $since  a Unix timestamp
-     * @param integer $limit  limit a maximum quantity of results to return
-     * @return array          Google spreadsheet IDs in order starting with the
-     *                        least and including up to LIMIT number of rows
+     * Filter ETL list to ones that can extract updated spreadsheets
+     * 
+     * @param array<EtlConfig> $jobs to filter
+     * @return array<EtlConfig> $jobs which may have new data (the spreadsheet was updated, not necessarily that sheet)
      */
-    abstract public function getIdsNotSeenSince(int $since, int $limit): array;
+    abstract public function filterExtractable(array $jobs): array;
+
+    // Setters /////////////////////////////////////////////////////////////////
 
     /**
-     * Get ETL details for a specific spreadsheet and sheet
-     *
-     * @param string $googleSpreadsheetId  specified Google spreadsheet ID
-     * @param string $sheetName            specified sheet name
-     * @return \stdClass|null              ETL information
-     */
-    abstract public function getEtl(string $googleSpreadsheetId, string $sheetName): ?\stdClass;
-
-    // Accounting //////////////////////////////////////////////////////////////
-
-    /**
-     * The accounting must be set up before any other methods are called
+     * Accounting must be set up before any other methods are called
      *
      * @apiSpec Calling this method twice shall not cause data loss or error.
      */
-    abstract protected function setUpAccounting();
+    abstract public function setUpAccounting(): void;
 
     /**
      * Account that a spreadsheet is seen, this confirms we have access
      */
-    abstract public function accountSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name);
-
-    // Data store //////////////////////////////////////////////////////////////
+    abstract public function setSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name): void;
 
     /**
-     * Removes sheet and accounting, if it exists, and loads and accounts for sheet
+     * Account that ETL was performed as of spreadsheets.google_modified time; and if rows are different than before
+     * then actually load the data
      *
-     * @apiSpec This operation shall be atomic, no partial effect may occur on
-     *          the database if program is prematurely exited.
+     * @apiSpec This operation shall be atomic, no partial effect may occur on the database if program is prematurely
+     *          exited.
      */
-    abstract public function loadAndAccountSheet(
+    abstract public function loadSheet(
         string $googleSpreadsheetId,
         string $sheetName,
         string $targetTable,
-        string $googleModified,
         array $columnNames,
-        array $rows
-    );
+        array $rows,
+        string $hash,
+    ): void;
 }

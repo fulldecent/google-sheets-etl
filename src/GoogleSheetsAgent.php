@@ -32,8 +32,8 @@ class GoogleSheetsAgent
     /**
      * List Google Sheets files chronologically by last modified date
      *
-     * Files are returned if their (modification time, ID) tuple is lexically
-     * greater than or equal to the given modification time and ID.
+     * Files are returned if their (modification time, ID) tuple is lexically greater than or equal to the given
+     * modification time and ID.
      *
      * @param string $modifiedTime limit for files to search
      * @param string $id           limit for files to search
@@ -57,7 +57,6 @@ class GoogleSheetsAgent
 
         // Collect file list
         $optParams = [
-            //'corpora'=> 'domain',
             'orderBy' => 'modifiedTime',
             'pageSize' => $count, // Google default is 100, maximum is 1000
             'q' => "mimeType = 'application/vnd.google-apps.spreadsheet' and modifiedTime >= '$modifiedTime'",
@@ -67,13 +66,8 @@ class GoogleSheetsAgent
             'includeTeamDriveItems' => 'true',
             'supportsTeamDrives' => 'true',
             'corpora' => 'allDrives',
-//            'corpora' => 'drive',
-//            'driveId' => '0AAGLxubfP1gqUk9PVA' // PMT Owners Shared Drive
         ];
-//        print_r($optParams);
-        // https://developers.google.com/drive/api/v3/reference/files/list
         $results = $googleService->files->listFiles($optParams);
-//        print_r($results);
         foreach ($results->getFiles() as $file) {
             if ($file->getModifiedTime() <= $modifiedTime) {
                 if ($file->getId() < $id) {
@@ -86,42 +80,37 @@ class GoogleSheetsAgent
     }
 
     /**
-     * Return all sheets of type GRID in a Google Spreadsheet
+     * Look up a specific Google Sheet
      *
-     * @param string $spreadsheetId which spreadsheet to load
+     * @param string $id Which Google Spreadsheet ID to search
      *
-     * @return array Sheet titles
+     * @return array Object containing (modifiedTime, name), or null if not found
      *
-     * @see https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get
+     * @see https://developers.google.com/drive/api/v3/reference/files/list
+     * @see https://tools.ietf.org/html/rfc3339
      */
-    public function getGridSheetTitles(string $spreadsheetId): array
-    {
+    public function getSpreadsheet(string $id): object {
         // Initialize client
-        $this->googleClient->setScopes(\Google_Service_Sheets::SPREADSHEETS_READONLY);
-        $googleService = new \Google_Service_Sheets($this->googleClient);
+        $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
+        $googleService = new \Google_Service_Drive($this->googleClient);
         $this->throttleIfNecessary();
 
-        // Collect file list
-        $optParams = [
-            'spreadsheetId' => $spreadsheetId,
-            'fields' => 'sheets(properties(title,sheetType))'
-        ];
-        $response = $googleService->spreadsheets->get($spreadsheetId, $optParams);
-        $retval = [];
-        foreach ($response->getSheets() as $sheet) {
-            if ($sheet->getProperties()->getSheetType() != 'GRID') {
-                continue;
-            }
-            $retval[] = $sheet->getProperties()->getTitle();
+        // Get file metadata
+        $result = $googleService->files->get($id, [
+            'fields' => 'id,modifiedTime,name',
+            'supportsAllDrives' => 'true',
+        ]);
+        if ($result) {
+            return (object)['modifiedTime'=>$result->getModifiedTime(), 'name'=>$result->getName()];
         }
-        return $retval;
+        return null;
     }
 
     /**
      * Load data from Google Sheets sheet as an array (rows) of arrays (columns)
      *
-     * @param string $spreadsheetId  the spreadsheet load
-     * @param string $sheetName      the sheet to load (must be GRID type)
+     * @param string $spreadsheetId the spreadsheet to load
+     * @param string $sheetName     the sheet to load (must be GRID type)
      * @return RowsOfColumns
      *
      * @see https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values#ValueRange
@@ -135,20 +124,22 @@ class GoogleSheetsAgent
 
         // Collect row data from sheet
         $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
-        return new RowsOfColumns($response->getValues());
+        $sha256Hash = hash('sha256', json_encode($response->getValues()));
+        return new RowsOfColumns($response->getValues(), $sha256Hash);
     }
 
     /**
      * Ensures that no more than one request is sent per second
      *
      * @see https://developers.google.com/sheets/api/limits
+     * "there's a read request limit of 300 per minute per project."
      */
     private function throttleIfNecessary()
     {
         $secondsExecuting = microtime(true) - $this->loadTime;
         if ($this->numberOfRequestsThisSession > $secondsExecuting) {
             echo '  Throttling...' . PHP_EOL;
-            usleep(($this->numberOfRequestsThisSession > $secondsExecuting) * 1000000);
+            usleep(($this->numberOfRequestsThisSession - $secondsExecuting) * 1000000);
         }
         $this->numberOfRequestsThisSession++;
     }

@@ -128,6 +128,11 @@ abstract class DatabaseAgent
      */
     abstract public function setSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name): void;
 
+    /** 
+     * Create table to prepare for load sheet
+     */
+    abstract public function createTable(string $targetTable, array $columnNames): void;
+
     /**
      * Account that ETL was performed as of spreadsheets.google_modified time; and if rows are different than before
      * then actually load the data

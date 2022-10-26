@@ -13,8 +13,8 @@ class EtlConfig
     public string $sheetName;
     public string $targetTable;
     public array $columnMapping;
-    public int $headerRow;
-    public int $skipRows;
+    public int $headerRow = 0;
+    public int $skipRows = 1;
 
     /**
      * Example:

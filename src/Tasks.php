@@ -51,7 +51,7 @@ class Tasks
                 $spreadsheet->modifiedTime,
                 $spreadsheet->name
             );
-            echo "Found new spreadsheet $googleSpreadsheetId $spreadsheet->name" . PHP_EOL;
+            echo "Saw update $googleSpreadsheetId {$spreadsheet->modifiedTime} $spreadsheet->name" . PHP_EOL;
         }
     }
 
@@ -93,10 +93,10 @@ class Tasks
      */
     private function loadSheet(EtlConfig $etlConfig): void
     {
-        echo '  Extracting ' . $etlConfig->googleSpreadsheetId . ' ' . $etlConfig->googleSheetName . PHP_EOL;
+        echo '  Extracting ' . $etlConfig->googleSpreadsheetId . ' ' . $etlConfig->sheetName . PHP_EOL;
         $sheetRows = $this->googleSheetsAgent->getSheetRows(
             $etlConfig->googleSpreadsheetId,
-            $etlConfig->googleSheetName,
+            $etlConfig->sheetName,
         );
         echo '    Transforming columns';
         try {
@@ -113,13 +113,14 @@ class Tasks
             );
         }
         echo '     Loading';
-        $columnNames = array_keys($configuration->columnMapping);
+        $columnNames = array_keys($etlConfig->columnMapping);
+        $this->databaseAgent->createTable($etlConfig->targetTable, $columnNames);
         try {
-            $dataRows = $sheetRows->getRows($selectors, $configuration->skipRows);
+            $dataRows = $sheetRows->getRows($selectors, $etlConfig->skipRows);
             $this->databaseAgent->loadSheet(
-                $googleSpreadsheetId,
-                $sheetName,
-                $targetTable,
+                $etlConfig->googleSpreadsheetId,
+                $etlConfig->sheetName,
+                $etlConfig->targetTable,
                 $columnNames,
                 $dataRows,
                 $sheetRows->hash,
@@ -127,7 +128,7 @@ class Tasks
         } catch (\Exception $exception) {
             throw new \Exception(
                 "Load failed for\n" .
-                'Spreadsheet" https://docs.google.com/spreadsheets/d/' . $etlConfig->googleSpreadsheetId . "\n" .
+                'Spreadsheet https://docs.google.com/spreadsheets/d/' . $etlConfig->googleSpreadsheetId . "\n" .
                 $exception->getMessage()
             );
         }

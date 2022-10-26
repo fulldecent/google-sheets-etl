@@ -94,7 +94,6 @@ class GoogleSheetsAgent
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
         $googleService = new \Google_Service_Drive($this->googleClient);
         $this->throttleIfNecessary();
-
         // Get file metadata
         $result = $googleService->files->get($id, [
             'fields' => 'id,modifiedTime,name',
@@ -139,7 +138,7 @@ class GoogleSheetsAgent
         $secondsExecuting = microtime(true) - $this->loadTime;
         if ($this->numberOfRequestsThisSession > $secondsExecuting) {
             echo '  Throttling...' . PHP_EOL;
-            usleep(($this->numberOfRequestsThisSession - $secondsExecuting) * 1000000);
+            usleep((int) floor(($this->numberOfRequestsThisSession - $secondsExecuting) * 1000000));
         }
         $this->numberOfRequestsThisSession++;
     }

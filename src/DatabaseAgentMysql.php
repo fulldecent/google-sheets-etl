@@ -62,24 +62,24 @@ SQL;
         }
 
         $sql = <<<SQL
-SELECT a.google_spreadsheet_id
+SELECT a.google_spreadsheet_id, b.sheet_name
   FROM $quotedSpreadsheetsTable a
   LEFT JOIN $quotedEtlJobsTable b
-    ON b.spreadsheet_id = a.google_spreadsheet_id
- WHERE (a.google_spreadsheet_id, a.google_spreadsheet_name) IN ($quotedJobs)
-   AND (b.google_modified IS NULL OR a.google_modified > b.google_modified)
+    ON b.spreadsheet_id = a.id
+ WHERE (a.google_spreadsheet_id, b.sheet_name) IN ($quotedIn)
+   AND (a.google_modified = b.google_modified)
 SQL;
         $statement = $this->database->prepare($sql);
         $statement->execute($params);
         $rows = $statement->fetchAll(\PDO::FETCH_NUM);
-        $updatedSpreadsheetIdsAndSheetNames = [];
+        $alreadyLoadedSpreadsheetIdsAndSheetNames = [];
         foreach ($rows as $row) {
-            $updatedSpreadsheetIdsAndSheetNames[$row[0]][$row[1]] = true;
+            $alreadyLoadedSpreadsheetIdsAndSheetNames[$row[0]][$row[1]] = true;
         }
 
         $extractable = [];
         foreach ($jobs as $job) {
-            if (isset($updatedSpreadsheetIdsAndSheetNames[$job->googleSpreadsheetId][$job->sheetName])) {
+            if (!isset($alreadyLoadedSpreadsheetIdsAndSheetNames[$job->googleSpreadsheetId][$job->sheetName])) {
                 $extractable[] = $job;
             }
         }
@@ -140,7 +140,6 @@ UPDATE google_modified = :google_modified,
        google_spreadsheet_name = :google_spreadsheet_name,
        last_seen = :last_seen
 SQL;
-echo $sql;
         $this->database->prepare($sql)->execute([
             'google_spreadsheet_id'=>$googleSpreadsheetId,
             'google_modified'=>$googleModified,
@@ -149,6 +148,36 @@ echo $sql;
         ]);
     }
 
+    /// @inheritdoc
+    public function createTable(string $targetTable, array $columnNames): void
+    {
+        $quotedTargetTable = $this->quotedFullyQualifiedTableName($targetTable);
+        $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
+        $normalizedQuotedColumnNames = $this->normalizedQuotedColumnNames($columnNames);
+        $createTableSql = <<<SQL
+CREATE TABLE IF NOT EXISTS $quotedTargetTable (
+    _rowid INT NOT NULL AUTO_INCREMENT,
+    _origin_etl_job_id INT NOT NULL,
+    _origin_row INT NOT NULL,
+    PRIMARY KEY (_rowid),
+    UNIQUE KEY _origin_row (_origin_etl_job_id, _origin_row),
+    FOREIGN KEY (_origin_etl_job_id)
+        REFERENCES $quotedEtlJobsTable(id)
+        ON DELETE RESTRICT
+        ON UPDATE RESTRICT
+) ENGINE=InnoDB;
+SQL;
+        $this->database->exec($createTableSql);
+        foreach ($normalizedQuotedColumnNames as $normalizedQuotedColumnName) {
+            $addColumnSql = "ALTER TABLE $quotedTargetTable ADD COLUMN $normalizedQuotedColumnName VARCHAR(100)";
+            try {
+                $this->database->exec($addColumnSql);
+            } catch (\PDOException $e) {
+                // Ignore if column already exists
+            }
+        }
+    }
+    
     /// @inheritdoc
     public function loadSheet(
         string $googleSpreadsheetId,
@@ -161,10 +190,7 @@ echo $sql;
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
-
-        // Create table
-        echo '    Creating table';
-        $this->createTable($targetTable, $columnNames);
+        $quotedTargetTable = $this->quotedFullyQualifiedTableName($targetTable);
 
         $this->database->beginTransaction(); // the CREATE/UPDATE above are implicit-commit statements
 
@@ -183,21 +209,16 @@ SQL;
             'sheet_name' => $sheetName,
         ]);
         $existingHash = $statement->fetchColumn();
-        if ($existingHash === $hash) {
-            echo '    No change in data, skipping load';
-            $this->database->commit();
-            return;
-        }
 
         $upsertAccountingSql = <<<SQL
 INSERT INTO $quotedEtlJobsTable
 (spreadsheet_id, sheet_name, target_table, google_modified, raw_columns_rows_hash)
-SELECT spreadsheets.id, :sheet_name, :target_table, :google_modified, :raw_columns_rows_hash
+SELECT spreadsheets.id, :sheet_name, :target_table, google_modified, :raw_columns_rows_hash
   FROM $quotedSpreadsheetsTable spreadsheets
  WHERE google_spreadsheet_id = :google_spreadsheet_id
     ON DUPLICATE KEY
 UPDATE target_table = :target_table,
-       google_modified = :google_modified,
+       google_modified = spreadsheets.google_modified,
        raw_columns_rows_hash = :raw_columns_rows_hash
 SQL;
         $statement = $this->database->prepare($upsertAccountingSql);
@@ -205,22 +226,29 @@ SQL;
             'google_spreadsheet_id' => $googleSpreadsheetId,
             'sheet_name' => $sheetName,
             'target_table' => $targetTable,
-            'google_modified' => $this->loadTime,
             'raw_columns_rows_hash' => $hash,
         ]);
 
+        if ($existingHash === $hash) {
+            echo "    No change in data, skipping load\n";
+            $this->database->commit();
+            return;
+        }
+
         $getEtlJobIdSql = <<<SQL
-SELECT id
-  FROM $quotedEtlJobsTable
-  JOIN $quotedSpreadsheetsTable
+SELECT etl_jobs.id
+  FROM $quotedEtlJobsTable etl_jobs
+  JOIN $quotedSpreadsheetsTable spreadsheets
     ON spreadsheets.id = etl_jobs.spreadsheet_id
  WHERE google_spreadsheet_id = :google_spreadsheet_id
    AND sheet_name = :sheet_name
 SQL;
-        $etlJobId = $this->database->prepare($getEtlJobIdSql)->execute([
+        $statement = $this->database->prepare($getEtlJobIdSql);
+        $statement->execute([
             'google_spreadsheet_id' => $googleSpreadsheetId,
             'sheet_name' => $sheetName,
-        ])->fetchColumn();
+        ]);
+        $etlJobId = $statement->fetchColumn();
         assert($etlJobId !== false);
 
         // Delete existing rows
@@ -229,10 +257,12 @@ SQL;
 DELETE FROM $quotedTargetTable
  WHERE _origin_etl_job_id = ?
 SQL;
-        $this->database->prepare($deleteSql)->execute([$etlJobId]);
+        $statement = $this->database->prepare($deleteSql);
+        $statement->execute([$etlJobId]);
 
         // Insert rows
         echo '    Inserting rows';
+        $normalizedQuotedColumnNames = $this->normalizedQuotedColumnNames($columnNames);
         $quotedColumns = implode(',', array_merge(['_origin_etl_job_id', '_origin_row'], $normalizedQuotedColumnNames));
         $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
         $sqlOneValueList = implode(',', array_fill(0, count($columnNames) + 2, '?'));
@@ -276,7 +306,10 @@ SQL;
     private function quotedFullyQualifiedTableName(string $unqualifiedName): string
     {
         $qualifiedTableName = ($this->tablePrefix ?? '') . $unqualifiedName;
-        return ($this->schema ?? '') . "`$qualifiedTableName`";
+        if (!empty($this->schema)) {
+            $qualifiedTableName = $this->schema . '.' . "`$qualifiedTableName`";
+        }
+        return $qualifiedTableName;
     }
 
     /**
@@ -306,33 +339,5 @@ SQL;
             array_push($retval, '`' . $column . '`');
         }
         return $retval;
-    }
-
-    private function createTable($targetTable, $columnNames): void
-    {
-        $quotedTargetTable = $this->quotedFullyQualifiedTableName($targetTable);
-        $normalizedQuotedColumnNames = $this->normalizedQuotedColumnNames($columnNames);
-        $createTableSql = <<<SQL
-CREATE TABLE IF NOT EXISTS $quotedTargetTable (
-    _rowid INT NOT NULL AUTO_INCREMENT,
-    _origin_etl_job_id INT NOT NULL,
-    _origin_row INT NOT NULL,
-    PRIMARY KEY (_rowid),
-    UNIQUE KEY _origin_row (_origin_etl_job_id, _origin_row),
-    FOREIGN KEY (_origin_etl_job_id)
-        REFERENCES $quotedEtlJobsTable(id)
-        ON DELETE RESTRICT
-        ON UPDATE RESTRICT
-) ENGINE=InnoDB;
-SQL;
-        $this->database->exec($createTableSql);
-        foreach ($normalizedQuotedColumnNames as $normalizedQuotedColumnName) {
-            $addColumnSql = "ALTER TABLE $quotedTargetTable ADD COLUMN $normalizedQuotedColumnName VARCHAR(100)";
-            try {
-                $this->database->exec($addColumnSql);
-            } catch (\PDOException $e) {
-                // Ignore if column already exists
-            }
-        }
     }
 }

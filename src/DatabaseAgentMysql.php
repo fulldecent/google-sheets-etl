@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A data store and accounting for putting CSV files into a PDO database
+ * A data store and accounting for spreadsheets in a database
  */
 class DatabaseAgentMysql extends DatabaseAgent
 {
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS $quotedEtlJobsTable (
     id INT NOT NULL AUTO_INCREMENT,
     spreadsheet_id INT NOT NULL,
     sheet_name VARCHAR(99) NOT NULL,
-    target_table VARCHAR(99),
+    target_table VARCHAR(99) NOT NULL,
     google_modified VARCHAR(99) NOT NULL,
     raw_columns_rows_hash VARCHAR(99) NOT NULL,
     PRIMARY KEY (id),

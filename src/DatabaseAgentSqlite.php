@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace fulldecent\GoogleSheetsEtl;
 
 /**
- * A data store and accounting for spreadsheets in a Sqlite database
+ * A data store and accounting for spreadsheets in a database
  */
 class DatabaseAgentSqlite extends DatabaseAgent
 {
@@ -17,7 +17,7 @@ class DatabaseAgentSqlite extends DatabaseAgent
      *
      * @var int
      */
-    public $sqlInsertChunkSize = 25;
+    public int $sqlInsertChunkSize = 25;
 
     public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
     public const ETL_JOBS_TABLE = '__meta_etl_jobs';

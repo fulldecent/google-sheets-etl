@@ -74,7 +74,15 @@ class Tasks
             echo 'No spreadsheets ever seen' . PHP_EOL;
             return true;
         }
-        $spreadsheet = $this->googleSheetsAgent->getSpreadsheet($oldestSeen);
+        try {
+            $spreadsheet = $this->googleSheetsAgent->getSpreadsheet($oldestSeen);
+        } catch (\Exception $e) {
+            // Is this a "File not found" error?
+            if (strpos($e->getMessage(), 'File not found') !== false) {
+                echo 'Oldest spreadsheet not accessible: ' . $oldestSeen . PHP_EOL;
+                return false;
+            }
+        }
         if (is_null($spreadsheet)) {
             echo "Oldest spreadsheet $oldestSeen is no longer accessible" . PHP_EOL;
             return false;

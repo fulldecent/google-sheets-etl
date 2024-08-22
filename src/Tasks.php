@@ -46,15 +46,16 @@ class Tasks
             200,
         );
         foreach ($someUpdatedSpreadsheets as $googleSpreadsheetId => $spreadsheet) {
+            echo "Saw update $googleSpreadsheetId {$spreadsheet->modifiedTime} $spreadsheet->name" . PHP_EOL;
             $this->databaseAgent->setSpreadsheetSeen(
                 $googleSpreadsheetId,
                 $spreadsheet->modifiedTime,
                 $spreadsheet->name
             );
-            echo "Saw update $googleSpreadsheetId {$spreadsheet->modifiedTime} $spreadsheet->name" . PHP_EOL;
         }
     }
 
+    // We must load them in order (cannot skip) because we need to know the oldest one for the next load
     public function loadSomeUpdatedSpreadsheets()
     {
         $loadableEtlConfigs = $this->databaseAgent->filterExtractable($this->etlConfig);
@@ -101,12 +102,12 @@ class Tasks
      */
     private function loadSheet(EtlConfig $etlConfig): void
     {
-        echo '  Extracting ' . $etlConfig->googleSpreadsheetId . ' ' . $etlConfig->sheetName . PHP_EOL;
+        echo 'Extracting ' . $etlConfig->googleSpreadsheetId . ' ' . $etlConfig->sheetName . PHP_EOL;
         $sheetRows = $this->googleSheetsAgent->getSheetRows(
             $etlConfig->googleSpreadsheetId,
             $etlConfig->sheetName,
         );
-        echo '    Transforming columns';
+        echo '  Transforming columns';
         try {
             $selectors = $sheetRows->getColumnSelectorsFromHeaderRow(
                 $etlConfig->columnMapping,
@@ -120,7 +121,6 @@ class Tasks
                 'Missing column ' . $exception->getMessage()
             );
         }
-        echo '     Loading';
         $columnNames = array_keys($etlConfig->columnMapping);
         $this->databaseAgent->createTable($etlConfig->targetTable, $columnNames);
         try {

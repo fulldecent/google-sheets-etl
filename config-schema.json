@@ -55,8 +55,7 @@
               }
             }
           },
-          "required": ["targetTable", "columnMapping"],
-          "additionalProperties": false
+          "required": ["targetTable", "columnMapping"]
         }
       }
     }

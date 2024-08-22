@@ -137,7 +137,7 @@ class GoogleSheetsAgent
     {
         $secondsExecuting = microtime(true) - $this->loadTime;
         if ($this->numberOfRequestsThisSession > $secondsExecuting) {
-            echo '  Throttling...' . PHP_EOL;
+            //echo '  Throttling...' . PHP_EOL;
             usleep((int) floor(($this->numberOfRequestsThisSession - $secondsExecuting) * 1000000));
         }
         $this->numberOfRequestsThisSession++;

@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
     id INT NOT NULL AUTO_INCREMENT,
     google_spreadsheet_id VARCHAR(44) NOT NULL,
     google_modified VARCHAR(99) NOT NULL,
-    google_spreadsheet_name VARCHAR(100) NOT NULL,
+    google_spreadsheet_name text NOT NULL, -- Google allows file names with length up to 32767, source: https://www.aurelp.com/2014/09/10/what-is-the-maximum-name-length-for-a-file-on-google-drive/
     last_seen INT NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY google_spreadsheet_id (google_spreadsheet_id)
@@ -252,7 +252,7 @@ SQL;
         assert($etlJobId !== false);
 
         // Delete existing rows
-        echo '    Deleting existing rows';
+        echo '  Deleting existing rows';
         $deleteSql = <<<SQL
 DELETE FROM $quotedTargetTable
  WHERE _origin_etl_job_id = ?
@@ -261,7 +261,7 @@ SQL;
         $statement->execute([$etlJobId]);
 
         // Insert rows
-        echo '    Inserting rows';
+        echo '  Loading rows';
         $normalizedQuotedColumnNames = $this->normalizedQuotedColumnNames($columnNames);
         $quotedColumns = implode(',', array_merge(['_origin_etl_job_id', '_origin_row'], $normalizedQuotedColumnNames));
         $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
@@ -275,6 +275,7 @@ SQL;
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
 /*
+            // If there is an error inserting don't do this. Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
             $parameters = array_map(function($v){
                 return is_null($v)
                     ? null
@@ -284,11 +285,12 @@ SQL;
             }, $parameters);
 */
             $statement->execute($parameters);
-            echo '        ' . (array_key_last($rowChunk) + 1) . ' rows' . PHP_EOL;
+            echo '  ' . (array_key_last($rowChunk) + 1);
         }
 
         // All done
-        $this->database->commit();        
+        $this->database->commit();
+        echo PHP_EOL;
     }
 
     // Private /////////////////////////////////////////////////////////////////////////////////////////////////////////

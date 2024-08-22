@@ -1,7 +1,6 @@
 [![PHP Composer](https://github.com/fulldecent/google-sheets-etl/actions/workflows/php.yml/badge.svg)](https://github.com/fulldecent/google-sheets-etl/actions/workflows/php.yml)
 
-Google Sheets ETL
-=================
+# Google Sheets ETL
 
 Import all your Google Sheets to your data warehouse, including periodic delta loads
 
@@ -15,7 +14,7 @@ See `example.php` how to use this library.
 Via Composer
 
 ```sh
-composer install
+composer require fulldecent/google-sheets-etl:dev-main
 ```
 
 Next, create a Google Service Account. This requires 20 steps so we made a [a step-by-step illustrated guide](GOOGLE-SETUP.md).

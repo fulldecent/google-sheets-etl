@@ -1,5 +1,4 @@
-Google Service Account Setup
-=================
+# Google service account setup
 
 You will create a Google Service Account which you, your employees, or others will share files with. Google Sheets ETL will log into Google as this service account to access those files.
 

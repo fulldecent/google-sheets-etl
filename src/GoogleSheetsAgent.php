@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace fulldecent\GoogleSheetsEtl;
 
+use GuzzleHttp\Middleware;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Exception\RequestException;
+use Psr\Http\Message\ResponseInterface;
+
 /**
  * Extract data from Google Sheets, load to PDO database
  */
@@ -19,6 +26,43 @@ class GoogleSheetsAgent
         json_decode(file_get_contents($newCredentialsFile)); // Validate file
         $this->credentialsFile = $newCredentialsFile;
         $this->googleClient = new \Google_Client();
+
+        // See Google API limits https://developers.google.com/sheets/api/limits
+        // Implement exponential backoff with Guzzle
+        $maxRetries = 5;
+        $retryMiddleware = Middleware::retry(
+            function (
+                $retries,
+                Request $request,
+                ResponseInterface $response = null,
+                RequestException $exception = null
+            ) use ($maxRetries) {
+                // Retry on server errors (5xx) or on connection errors (e.g., timeouts)
+                if ($retries >= $maxRetries) {
+                    return false; // Stop retrying after reaching max retries
+                }
+                if ($response && in_array($response->getStatusCode(), [429, 500, 502, 503, 504])) {
+                    return true;
+                }
+                if ($exception instanceof RequestException) {
+                    return true;
+                }
+                return false;
+            },
+            function ($retries) {
+                $jitter = rand(0, 1000); // Add some randomness to the backoff
+                return 1000 * pow(2, $retries) + $jitter; // Exponential backoff with jitter
+            }
+        );
+
+        $stack = HandlerStack::create();
+        $stack->push($retryMiddleware);
+        $httpClient = new Client([
+            'handler' => $stack,
+            'connect_timeout' => 10,
+            'timeout' => 10,
+        ]);
+        $this->googleClient->setHttpClient($httpClient);
         $this->googleClient->setAuthConfig($this->credentialsFile);
         $this->loadTime = microtime(true);
     }
@@ -53,7 +97,6 @@ class GoogleSheetsAgent
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
         $googleService = new \Google_Service_Drive($this->googleClient);
-        $this->throttleIfNecessary();
 
         // Collect file list
         $optParams = [
@@ -93,7 +136,6 @@ class GoogleSheetsAgent
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);
         $googleService = new \Google_Service_Drive($this->googleClient);
-        $this->throttleIfNecessary();
         // Get file metadata
         $result = $googleService->files->get($id, [
             'fields' => 'id,modifiedTime,name',
@@ -119,27 +161,10 @@ class GoogleSheetsAgent
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Sheets::SPREADSHEETS_READONLY);
         $googleService = new \Google_Service_Sheets($this->googleClient);
-        $this->throttleIfNecessary();
 
         // Collect row data from sheet
         $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
         $sha256Hash = hash('sha256', json_encode($response->getValues()));
         return new RowsOfColumns($response->getValues(), $sha256Hash);
-    }
-
-    /**
-     * Ensures that no more than one request is sent per second
-     *
-     * @see https://developers.google.com/sheets/api/limits
-     * "there's a read request limit of 300 per minute per project."
-     */
-    private function throttleIfNecessary()
-    {
-        $secondsExecuting = microtime(true) - $this->loadTime;
-        if ($this->numberOfRequestsThisSession > $secondsExecuting) {
-            //echo '  Throttling...' . PHP_EOL;
-            usleep((int) floor(($this->numberOfRequestsThisSession - $secondsExecuting) * 1000000));
-        }
-        $this->numberOfRequestsThisSession++;
     }
 }

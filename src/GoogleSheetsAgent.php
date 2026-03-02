@@ -8,7 +8,7 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\TransferException;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -35,7 +35,7 @@ class GoogleSheetsAgent
                 $retries,
                 Request $request,
                 ResponseInterface $response = null,
-                RequestException $exception = null
+                \Throwable $exception = null
             ) use ($maxRetries) {
                 // Retry on server errors (5xx) or on connection errors (e.g., timeouts)
                 if ($retries >= $maxRetries) {
@@ -44,7 +44,7 @@ class GoogleSheetsAgent
                 if ($response && in_array($response->getStatusCode(), [429, 500, 502, 503, 504])) {
                     return true;
                 }
-                if ($exception instanceof RequestException) {
+                if ($exception instanceof TransferException) {
                     return true;
                 }
                 return false;

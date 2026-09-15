@@ -7,7 +7,7 @@ Import all your Google Sheets to your data warehouse, including periodic delta l
 <img width="1993" alt="Screen Shot 2019-11-07 at 15 44 33" src="https://user-images.githubusercontent.com/382183/68426182-91f86d00-0175-11ea-8915-3ca3700488bd.png">
 
 
-See `example.php` how to use this library.
+See `example.php` for how to use this library.
 
 ## Install
 
@@ -42,6 +42,20 @@ We found several problems with using Google Sheets as a database, even though we
 - Cannot create a sheet-level comment to document the purpose of the whole sheet 
 - Filters cannot be used, because they hide rows for everybody
   - If using another mode "filter views", which is harder to find, it will create hundreds of saved "Filter 1", "Filter 2" ... files.
+
+## Maintenance
+
+Perform these activities quarterly. Last updated 2026-09-15.
+
+1. Review outdated and vulnerable dependencies:
+
+   ```sh
+   composer outdated --direct
+   composer audit
+   composer update
+   ```
+
+2. Update dependencies in [GitHub Actions workflows](.github/workflows/)
 
 ## References
 

@@ -10,6 +10,7 @@ class TasksTest extends \PHPUnit\Framework\TestCase
     private DatabaseAgent $databaseAgent;
     private Tasks $tasks;
 
+    #[\Override]
     protected function setUp(): void
     {
         $this->googleSheetsAgent = $this->createStub(GoogleSheetsAgent::class);
@@ -53,12 +54,16 @@ class TasksTest extends \PHPUnit\Framework\TestCase
     {
         $spreadsheet = (object) ['modifiedTime' => '2026-09-15T00:00:00Z', 'name' => 'Planning'];
         $databaseAgent = $this->createMock(DatabaseAgent::class);
+        $googleSheetsAgent = $this->createMock(GoogleSheetsAgent::class);
         $databaseAgent->method('getOldestSeen')->willReturn('sheet-a');
-        $this->googleSheetsAgent->method('getSpreadsheet')->with('sheet-a')->willReturn($spreadsheet);
+        $googleSheetsAgent->expects(self::once())
+            ->method('getSpreadsheet')
+            ->with('sheet-a')
+            ->willReturn($spreadsheet);
         $databaseAgent->expects(self::once())
             ->method('setSpreadsheetSeen')
             ->with('sheet-a', $spreadsheet->modifiedTime, $spreadsheet->name);
-        $tasks = new Tasks('', $this->createStub(\PDO::class), $this->googleSheetsAgent, $databaseAgent);
+        $tasks = new Tasks('', $this->createStub(\PDO::class), $googleSheetsAgent, $databaseAgent);
 
         self::assertTrue($tasks->verifyOldestSpreadsheet());
     }

@@ -69,15 +69,12 @@ abstract class DatabaseAgent
 
     final public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
     {
-        switch ($newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME)) {
-            case 'sqlite':
-                return new DatabaseAgentSqlite($newDatabase);
-            case 'mysql':
-                return new DatabaseAgentMysql($newDatabase);
-            default:
-                echo "Unexpected driver: " . $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
-                exit(1);
-        }
+        $driver = $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        return match ($driver) {
+            'sqlite' => new DatabaseAgentSqlite($newDatabase),
+            'mysql' => new DatabaseAgentMysql($newDatabase),
+            default => throw new \InvalidArgumentException("Unsupported PDO driver: $driver"),
+        };
     }
 
     protected function __construct(\PDO $newDatabase)

@@ -47,7 +47,9 @@ We found several problems with using Google Sheets as a database, even though we
 
 Perform these activities quarterly. Last updated 2026-09-15.
 
-1. Review outdated and vulnerable dependencies:
+1. Update PHP version requirement to drop versions that PHP does not support actively any more.
+
+2. Review outdated and vulnerable dependencies:
 
    ```sh
    composer outdated --direct
@@ -55,7 +57,7 @@ Perform these activities quarterly. Last updated 2026-09-15.
    composer update
    ```
 
-2. Update dependencies in [GitHub Actions workflows](.github/workflows/)
+3. Update dependencies in [GitHub Actions workflows](.github/workflows/)
 
 ## References
 

@@ -15,12 +15,13 @@ class DatabaseAgentMysql extends DatabaseAgent
      */
     public int $sqlInsertChunkSize = 500;
 
-    public const SPREADSHEETS_TABLE = '__meta_spreadsheets';
-    public const ETL_JOBS_TABLE = '__meta_etl_jobs';
+    public const string SPREADSHEETS_TABLE = '__meta_spreadsheets';
+    public const string ETL_JOBS_TABLE = '__meta_etl_jobs';
 
     // Getters /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc
+    #[\Override]
     public function getGreatestModified(): ?array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
@@ -35,6 +36,7 @@ SQL;
     }
 
     /// @inheritdoc
+    #[\Override]
     public function getOldestSeen(): ?string
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
@@ -49,6 +51,7 @@ SQL;
     }
 
     /// @inheritdoc
+    #[\Override]
     public function filterExtractable(array $jobs): array
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
@@ -89,6 +92,7 @@ SQL;
     // Setters /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @inheritdoc
+    #[\Override]
     public function setUpAccounting(): void
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
@@ -128,6 +132,7 @@ SQL;
     }
 
     /// @inheritdoc
+    #[\Override]
     public function setSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name): void
     {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
@@ -150,6 +155,7 @@ SQL;
     }
 
     /// @inheritdoc
+    #[\Override]
     public function createTable(string $targetTable, array $columnNames): void
     {
         $quotedTargetTable = $this->quotedFullyQualifiedTableName($targetTable);
@@ -180,6 +186,7 @@ SQL;
     }
     
     /// @inheritdoc
+    #[\Override]
     public function loadSheet(
         string $googleSpreadsheetId,
         string $sheetName,

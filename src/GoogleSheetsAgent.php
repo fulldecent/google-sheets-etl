@@ -23,7 +23,13 @@ class GoogleSheetsAgent
 
     public function __construct(string $newCredentialsFile)
     {
-        json_decode(file_get_contents($newCredentialsFile)); // Validate file
+        $credentialsJson = file_get_contents($newCredentialsFile);
+        if ($credentialsJson === false) {
+            throw new \RuntimeException("Unable to read credentials file: $newCredentialsFile");
+        }
+        if (!json_validate($credentialsJson)) {
+            throw new \JsonException('Invalid credentials JSON: ' . json_last_error_msg(), json_last_error());
+        }
         $this->credentialsFile = $newCredentialsFile;
         $this->googleClient = new \Google_Client();
 

@@ -62,7 +62,7 @@ abstract class DatabaseAgent
 
     protected \PDO $database;
 
-    /** 
+    /**
      * The time this script was started
      */
     protected int $loadTime;
@@ -108,7 +108,7 @@ abstract class DatabaseAgent
 
     /**
      * Filter ETL list to ones that can extract updated spreadsheets
-     * 
+     *
      * @param array<EtlConfig> $jobs to filter
      * @return array<EtlConfig> $jobs which may have new data (the spreadsheet was updated, not necessarily that sheet)
      */
@@ -126,9 +126,13 @@ abstract class DatabaseAgent
     /**
      * Account that a spreadsheet is seen, this confirms we have access
      */
-    abstract public function setSpreadsheetSeen(string $googleSpreadsheetId, string $googleModified, string $name): void;
+    abstract public function setSpreadsheetSeen(
+        string $googleSpreadsheetId,
+        string $googleModified,
+        string $name
+    ): void;
 
-    /** 
+    /**
      * Create table to prepare for load sheet
      */
     abstract public function createTable(string $targetTable, array $columnNames): void;

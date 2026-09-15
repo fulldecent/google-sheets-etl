@@ -27,7 +27,7 @@ class EtlConfig
      *     "headerRow": 0,
      *     "skipRows": 1
      * }
-     * 
+     *
      * @param $file JSON configuration file conforming to config-schema.json
      * @return array of EtlConfig
      */

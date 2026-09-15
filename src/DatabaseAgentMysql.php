@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS $quotedSpreadsheetsTable (
     id INT NOT NULL AUTO_INCREMENT,
     google_spreadsheet_id VARCHAR(44) NOT NULL,
     google_modified VARCHAR(99) NOT NULL,
-    google_spreadsheet_name text NOT NULL, -- Google allows file names with length up to 32767, source: https://www.aurelp.com/2014/09/10/what-is-the-maximum-name-length-for-a-file-on-google-drive/
+    -- Google allows file names with length up to 32767.
+    google_spreadsheet_name text NOT NULL,
     last_seen INT NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY google_spreadsheet_id (google_spreadsheet_id)
@@ -186,8 +187,7 @@ SQL;
         array $columnNames,
         array $rows,
         string $hash,
-    ): void
-    {
+    ): void {
         $quotedSpreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
         $quotedEtlJobsTable = $this->quotedFullyQualifiedTableName(self::ETL_JOBS_TABLE);
         $quotedTargetTable = $this->quotedFullyQualifiedTableName($targetTable);
@@ -275,7 +275,8 @@ SQL;
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
 /*
-            // If there is an error inserting don't do this. Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
+            // If there is an error inserting don't do this.
+            // Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
             $parameters = array_map(function($v){
                 return is_null($v)
                     ? null

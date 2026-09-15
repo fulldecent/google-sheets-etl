@@ -17,10 +17,14 @@ class Tasks
      */
     public array $etlConfig = [];
 
-    public function __construct(string $credentialsFile, \PDO $database)
-    {
-        $this->googleSheetsAgent =  new GoogleSheetsAgent($credentialsFile);
-        $this->databaseAgent = DatabaseAgent::agentForPdo($database);
+    public function __construct(
+        string $credentialsFile,
+        \PDO $database,
+        ?GoogleSheetsAgent $googleSheetsAgent = null,
+        ?DatabaseAgent $databaseAgent = null
+    ) {
+        $this->googleSheetsAgent = $googleSheetsAgent ?? new GoogleSheetsAgent($credentialsFile);
+        $this->databaseAgent = $databaseAgent ?? DatabaseAgent::agentForPdo($database);
     }
 
     public function loadConfiguration(string $file): void
@@ -77,12 +81,12 @@ class Tasks
         }
         try {
             $spreadsheet = $this->googleSheetsAgent->getSpreadsheet($oldestSeen);
-        } catch (\Exception $e) {
-            // Is this a "File not found" error?
-            if (strpos($e->getMessage(), 'File not found') !== false) {
+        } catch (\Google\Service\Exception $exception) {
+            if ($exception->getCode() === 404) {
                 echo 'Oldest spreadsheet not accessible: ' . $oldestSeen . PHP_EOL;
                 return false;
             }
+            throw $exception;
         }
         if (is_null($spreadsheet)) {
             echo "Oldest spreadsheet $oldestSeen is no longer accessible" . PHP_EOL;

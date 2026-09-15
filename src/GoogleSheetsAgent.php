@@ -127,12 +127,12 @@ class GoogleSheetsAgent
      *
      * @param string $id Which Google Spreadsheet ID to search
      *
-     * @return array Object containing (modifiedTime, name), or null if not found
+    * @return ?object Object containing (modifiedTime, name), or null if not found
      *
      * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339
      */
-    public function getSpreadsheet(string $id): object
+    public function getSpreadsheet(string $id): ?object
     {
         // Initialize client
         $this->googleClient->setScopes(\Google_Service_Drive::DRIVE_METADATA_READONLY);

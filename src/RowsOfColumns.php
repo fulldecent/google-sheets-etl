@@ -12,15 +12,20 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class RowsOfColumns
 {
+    /** @var array<int, array<int, string>> */
     private array $rowsOfColumns;
+
     public string $hash;
 
+    /**
+     * @param array<int, array<int, scalar|null>> $values
+     */
     public function __construct(array $values, string $hash)
     {
         $temp = [];
         foreach ($values as $rowIndex => $columns) {
-            foreach ($columns as $columnIndex => $stringData) {
-                $temp[$rowIndex][$columnIndex] = trim($stringData);
+            foreach ($columns as $columnIndex => $cell) {
+                $temp[$rowIndex][$columnIndex] = trim((string) $cell);
             }
         }
         $this->rowsOfColumns = $temp;
@@ -30,9 +35,9 @@ class RowsOfColumns
     /**
      * Gets column selectors for the specified names from a header row
      *
-     * @param array   $specifiers indicies (zero-indexed) or names of columns
+     * @param array<int|string, int|string> $specifiers indicies (zero-indexed) or names of columns
      * @param integer $headerRow  which row (zero-indexed) to retrieve from
-     * @return array              columns (zero-indexed) for names specified
+     * @return list<int>          columns (zero-indexed) for names specified
      */
     public function getColumnSelectorsFromHeaderRow(array $specifiers, int $headerRow = 0): array
     {
@@ -46,9 +51,9 @@ class RowsOfColumns
                     throw new \Exception("Column index out of bounds: $specifier");
                 }
             } elseif (is_string($specifier)) {
-//                $selector = array_search(strtolower($specifier), array_map('strtolower',$row), true);
+                //                $selector = array_search(strtolower($specifier), array_map('strtolower',$row), true);
                 $selector = array_search($specifier, $row, true);
-                if ($selector === false) {
+                if (!is_int($selector)) {
                     throw new \Exception('Required column not found: ' . $specifier);
                 }
                 $retval[] = $selector;
@@ -62,10 +67,10 @@ class RowsOfColumns
     /**
      * Return a two-dimensional array of values
      *
-     * @param array   $columnSelectors specifyies which columns (zero-indexed)
+     * @param list<int> $columnSelectors specifyies which columns (zero-indexed)
      *                                 to extract from each row of source data
      * @param integer $skipRows        number of rows to skip from source data
-     * @return array                   rows, each containing an array (columns) of values
+     * @return list<list<string|null>> rows, each containing an array (columns) of values
      */
     public function getRows(array $columnSelectors, int $skipRows = 1): array
     {

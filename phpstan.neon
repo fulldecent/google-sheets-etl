@@ -1,0 +1,9 @@
+includes:
+  - vendor/phpstan/phpstan-phpunit/extension.neon
+
+parameters:
+  level: 9
+  paths:
+    - src
+    - bin/google-sheets-etl
+    - tests

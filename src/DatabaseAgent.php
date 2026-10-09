@@ -70,11 +70,24 @@ abstract class DatabaseAgent
     final public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
     {
         $driver = $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if (!is_string($driver)) {
+            throw new \InvalidArgumentException('PDO driver name is missing');
+        }
         return match ($driver) {
             'sqlite' => new DatabaseAgentSqlite($newDatabase),
             'mysql' => new DatabaseAgentMysql($newDatabase),
             default => throw new \InvalidArgumentException("Unsupported PDO driver: $driver"),
         };
+    }
+
+    protected function query(string $sql): \PDOStatement
+    {
+        $statement = $this->database->query($sql);
+        if ($statement === false) {
+            $info = $this->database->errorInfo();
+            throw new \RuntimeException($info[2] ?? 'Query failed');
+        }
+        return $statement;
     }
 
     protected function __construct(\PDO $newDatabase)
@@ -91,7 +104,7 @@ abstract class DatabaseAgent
      *
      * @see https://tools.ietf.org/html/rfc3339
      *
-     * @return ?array like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
+     * @return array{0: string, 1: string}|null like ['2015-01-01T03:04:05Z', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
      */
     abstract public function getGreatestModified(): ?array;
 
@@ -106,8 +119,8 @@ abstract class DatabaseAgent
     /**
      * Filter ETL list to ones that can extract updated spreadsheets
      *
-     * @param array<EtlConfig> $jobs to filter
-     * @return array<EtlConfig> $jobs which may have new data (the spreadsheet was updated, not necessarily that sheet)
+     * @param list<EtlConfig> $jobs to filter
+     * @return list<EtlConfig> $jobs which may have new data (the spreadsheet was updated, not necessarily that sheet)
      */
     abstract public function filterExtractable(array $jobs): array;
 
@@ -131,6 +144,8 @@ abstract class DatabaseAgent
 
     /**
      * Create table to prepare for load sheet
+     *
+     * @param list<string> $columnNames
      */
     abstract public function createTable(string $targetTable, array $columnNames): void;
 
@@ -140,6 +155,9 @@ abstract class DatabaseAgent
      *
      * @apiSpec This operation shall be atomic, no partial effect may occur on the database if program is prematurely
      *          exited.
+     *
+     * @param list<string> $columnNames
+     * @param array<int, list<string|null>> $rows
      */
     abstract public function loadSheet(
         string $googleSpreadsheetId,

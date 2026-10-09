@@ -7,8 +7,8 @@ namespace fulldecent\GoogleSheetsEtl;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Exception\TransferException;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -18,8 +18,6 @@ class GoogleSheetsAgent
 {
     private string $credentialsFile;
     private \Google_Client $googleClient;
-    private float $loadTime;
-    private int $numberOfRequestsThisSession = 0;
 
     public function __construct(string $newCredentialsFile)
     {
@@ -38,26 +36,23 @@ class GoogleSheetsAgent
         $maxRetries = 5;
         $retryMiddleware = Middleware::retry(
             function (
-                $retries,
-                Request $request,
-                ResponseInterface $response = null,
-                \Throwable $exception = null
-            ) use ($maxRetries) {
+                int $retries,
+                RequestInterface $request,
+                ?ResponseInterface $response = null,
+                mixed $exception = null
+            ) use ($maxRetries): bool {
                 // Retry on server errors (5xx) or on connection errors (e.g., timeouts)
                 if ($retries >= $maxRetries) {
                     return false; // Stop retrying after reaching max retries
                 }
-                if ($response && in_array($response->getStatusCode(), [429, 500, 502, 503, 504])) {
+                if ($response !== null && in_array($response->getStatusCode(), [429, 500, 502, 503, 504], true)) {
                     return true;
                 }
-                if ($exception instanceof TransferException) {
-                    return true;
-                }
-                return false;
+                return $exception instanceof TransferException;
             },
-            function ($retries) {
+            function (int $retries): int {
                 $jitter = rand(0, 1000); // Add some randomness to the backoff
-                return 1000 * pow(2, $retries) + $jitter; // Exponential backoff with jitter
+                return 1000 * (2 ** $retries) + $jitter; // Exponential backoff with jitter
             }
         );
 
@@ -70,12 +65,18 @@ class GoogleSheetsAgent
         ]);
         $this->googleClient->setHttpClient($httpClient);
         $this->googleClient->setAuthConfig($this->credentialsFile);
-        $this->loadTime = microtime(true);
     }
 
-    public function getAccountName()
+    public function getAccountName(): string
     {
-        $config = json_decode(file_get_contents($this->credentialsFile));
+        $json = file_get_contents($this->credentialsFile);
+        if ($json === false) {
+            throw new \RuntimeException("Unable to read credentials file: {$this->credentialsFile}");
+        }
+        $config = json_decode($json);
+        if (!$config instanceof \stdClass || !isset($config->client_email) || !is_string($config->client_email)) {
+            throw new \RuntimeException('Credentials are missing client_email');
+        }
         return $config->client_email;
     }
 
@@ -89,7 +90,7 @@ class GoogleSheetsAgent
      * @param string $id           limit for files to search
      * @param int    $count        limit number of results
      *
-     * @return array Array with elements ID -> modifiedTime (RFC 3339 format)
+     * @return array<string, object{modifiedTime: string, name: string}>
      *
      * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339
@@ -123,7 +124,10 @@ class GoogleSheetsAgent
                     continue;
                 }
             }
-            $retval[$file->getId()] = (object)['modifiedTime'=>$file->getModifiedTime(), 'name'=>$file->getName()];
+            $retval[$file->getId()] = (object) [
+                'modifiedTime' => $file->getModifiedTime(),
+                'name' => $file->getName(),
+            ];
         }
         return $retval;
     }
@@ -133,7 +137,7 @@ class GoogleSheetsAgent
      *
      * @param string $id Which Google Spreadsheet ID to search
      *
-        * @return ?object Object containing (modifiedTime, name), or null if not found
+     * @return object{modifiedTime: string, name: string}|null
      *
      * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339
@@ -148,10 +152,10 @@ class GoogleSheetsAgent
             'fields' => 'id,modifiedTime,name',
             'supportsAllDrives' => 'true',
         ]);
-        if ($result) {
-            return (object)['modifiedTime'=>$result->getModifiedTime(), 'name'=>$result->getName()];
-        }
-        return null;
+        return (object) [
+            'modifiedTime' => $result->getModifiedTime(),
+            'name' => $result->getName(),
+        ];
     }
 
     /**
@@ -171,7 +175,11 @@ class GoogleSheetsAgent
 
         // Collect row data from sheet
         $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
-        $sha256Hash = hash('sha256', json_encode($response->getValues()));
-        return new RowsOfColumns($response->getValues(), $sha256Hash);
+        $values = $response->getValues() ?? [];
+        $encoded = json_encode($values);
+        if ($encoded === false) {
+            throw new \RuntimeException('Unable to hash sheet values');
+        }
+        return new RowsOfColumns($values, hash('sha256', $encoded));
     }
 }

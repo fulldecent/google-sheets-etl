@@ -17,21 +17,25 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
             \PDO::ATTR_PERSISTENT => false,
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_SILENT
         ]);
-        $this->databaseAgent = DatabaseAgent::agentForPdo($this->database);
+        $agent = DatabaseAgent::agentForPdo($this->database);
+        if (!$agent instanceof DatabaseAgentSqlite) {
+            throw new \RuntimeException('Expected a SQLite database agent');
+        }
+        $this->databaseAgent = $agent;
         $this->databaseAgent->setUpAccounting();
     }
 
     public function testMetadataTablesCreated(): void
     {
         $this->databaseAgent->setUpAccounting();
-        $tables = $this->database->query(<<<SQL
+        $tables = $this->query(<<<SQL
             SELECT name FROM sqlite_master
              WHERE type = 'table' AND name LIKE '__meta_%'
              ORDER BY name
             SQL)->fetchAll(\PDO::FETCH_COLUMN);
 
         self::assertSame(['__meta_etl_jobs', '__meta_spreadsheets'], $tables);
-        self::assertSame(1, (int) $this->database->query('PRAGMA foreign_keys')->fetchColumn());
+        self::assertSame(1, (int) $this->query('PRAGMA foreign_keys')->fetchColumn());
         self::assertSame(\PDO::ERRMODE_EXCEPTION, $this->database->getAttribute(\PDO::ATTR_ERRMODE));
     }
 
@@ -47,7 +51,7 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
 
         $this->databaseAgent->setSpreadsheetSeen('sheet-a', '2026-03-01T00:00:00Z', 'Renamed A');
         self::assertSame(['2026-03-01T00:00:00Z', 'sheet-a'], $this->databaseAgent->getGreatestModified());
-        self::assertSame(2, (int) $this->database->query('SELECT COUNT(*) FROM __meta_spreadsheets')->fetchColumn());
+        self::assertSame(2, (int) $this->query('SELECT COUNT(*) FROM __meta_spreadsheets')->fetchColumn());
     }
 
     public function testCreatesAndLoadsTargetTable(): void
@@ -63,7 +67,7 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
             'hash-1',
         );
 
-        $rows = $this->database->query(<<<SQL
+        $rows = $this->query(<<<SQL
             SELECT "first name", col_2, _123 FROM target ORDER BY _origin_row
             SQL)->fetchAll(\PDO::FETCH_NUM);
         self::assertSame([['Ada', 'Lovelace', 'one'], ['Grace', 'Hopper', 'two']], $rows);
@@ -78,15 +82,15 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
 
         $this->databaseAgent->loadSheet('sheet-a', 'People', 'target', ['Name'], [['Ada']], 'hash-1');
         self::assertSame([], $this->databaseAgent->filterExtractable([$job]));
-        self::assertSame('target', $this->database->query('SELECT target_table FROM __meta_etl_jobs')->fetchColumn());
+        self::assertSame('target', $this->query('SELECT target_table FROM __meta_etl_jobs')->fetchColumn());
 
         $this->databaseAgent->loadSheet('sheet-a', 'People', 'target', ['Name'], [['Ignored']], 'hash-1');
-        self::assertSame(['Ada'], $this->database->query('SELECT name FROM target')->fetchAll(\PDO::FETCH_COLUMN));
+        self::assertSame(['Ada'], $this->query('SELECT name FROM target')->fetchAll(\PDO::FETCH_COLUMN));
 
         $this->databaseAgent->setSpreadsheetSeen('sheet-a', '2026-02-01T00:00:00Z', 'Sheet A');
         self::assertSame([$job], $this->databaseAgent->filterExtractable([$job]));
         $this->databaseAgent->loadSheet('sheet-a', 'People', 'target', ['Name'], [['Grace']], 'hash-2');
-        self::assertSame(['Grace'], $this->database->query('SELECT name FROM target')->fetchAll(\PDO::FETCH_COLUMN));
+        self::assertSame(['Grace'], $this->query('SELECT name FROM target')->fetchAll(\PDO::FETCH_COLUMN));
     }
 
     public function testFiltersJobsAcrossBatchBoundary(): void
@@ -114,10 +118,10 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
         $this->databaseAgent->createTable('new_target', ['Name']);
         $this->databaseAgent->loadSheet('sheet-a', 'People', 'new_target', ['Name'], [['Ada']], 'same-hash');
 
-        self::assertSame(['Ada'], $this->database->query('SELECT name FROM new_target')->fetchAll(\PDO::FETCH_COLUMN));
+        self::assertSame(['Ada'], $this->query('SELECT name FROM new_target')->fetchAll(\PDO::FETCH_COLUMN));
         self::assertSame(
             'new_target',
-            $this->database->query('SELECT target_table FROM __meta_etl_jobs')->fetchColumn(),
+            $this->query('SELECT target_table FROM __meta_etl_jobs')->fetchColumn(),
         );
     }
 
@@ -130,7 +134,7 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
 
         self::assertSame(
             [['a', 'b', 'c']],
-            $this->database->query('SELECT col_1, col_2, col_3 FROM target')->fetchAll(\PDO::FETCH_NUM),
+            $this->query('SELECT col_1, col_2, col_3 FROM target')->fetchAll(\PDO::FETCH_NUM),
         );
     }
 
@@ -147,7 +151,7 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
 
         self::assertSame(
             ['Ada'],
-            $this->database->query('SELECT name FROM warehouse."etl""_target"')->fetchAll(\PDO::FETCH_COLUMN),
+            $this->query('SELECT name FROM warehouse."etl""_target"')->fetchAll(\PDO::FETCH_COLUMN),
         );
     }
 
@@ -164,10 +168,10 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
             self::assertFalse($this->database->inTransaction());
         }
 
-        self::assertSame(['Ada'], $this->database->query('SELECT name FROM target')->fetchAll(\PDO::FETCH_COLUMN));
+        self::assertSame(['Ada'], $this->query('SELECT name FROM target')->fetchAll(\PDO::FETCH_COLUMN));
         self::assertSame(
             'hash-1',
-            $this->database->query('SELECT raw_columns_rows_hash FROM __meta_etl_jobs')->fetchColumn(),
+            $this->query('SELECT raw_columns_rows_hash FROM __meta_etl_jobs')->fetchColumn(),
         );
     }
 
@@ -181,8 +185,17 @@ class DatabaseAgentSqliteTest extends \PHPUnit\Framework\TestCase
             $this->databaseAgent->loadSheet('missing', 'People', 'target', ['Name'], [['Ada']], 'hash-1');
         } finally {
             self::assertFalse($this->database->inTransaction());
-            self::assertSame(0, (int) $this->database->query('SELECT COUNT(*) FROM target')->fetchColumn());
+            self::assertSame(0, (int) $this->query('SELECT COUNT(*) FROM target')->fetchColumn());
         }
+    }
+
+    private function query(string $sql): \PDOStatement
+    {
+        $statement = $this->database->query($sql);
+        if ($statement === false) {
+            throw new \RuntimeException('Query failed');
+        }
+        return $statement;
     }
 
     private function job(string $spreadsheetId, string $sheetName, string $targetTable): EtlConfig

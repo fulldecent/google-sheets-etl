@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+# The published archive is the library. CI keeps the rest.
+/.github export-ignore
+/.editorconfig export-ignore
+/.gitignore export-ignore
+/.markdownlint.json export-ignore
+/.markdownlintignore export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/.php-version export-ignore
+/.prettierignore export-ignore
+/composer.lock export-ignore
+/dist export-ignore
+/phpstan.neon export-ignore
+/phpunit.xml export-ignore
+/phpunit.xml.dist export-ignore
+/tests export-ignore
+/vendor export-ignore

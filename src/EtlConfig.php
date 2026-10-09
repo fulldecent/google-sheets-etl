@@ -12,7 +12,10 @@ class EtlConfig
     public string $googleSpreadsheetId;
     public string $sheetName;
     public string $targetTable;
-    public array $columnMapping;
+
+    /** @var array<string, int|string> */
+    public array $columnMapping = [];
+
     public int $headerRow = 0;
     public int $skipRows = 1;
 
@@ -28,25 +31,58 @@ class EtlConfig
      *     "skipRows": 1
      * }
      *
-     * @param $file JSON configuration file conforming to config-schema.json
-     * @return array of EtlConfig
+     * @param string $file JSON configuration file conforming to config-schema.json
+     * @return list<EtlConfig>
      */
-    public static function fromFile($file): array
+    public static function fromFile(string $file): array
     {
-        $config = json_decode(file_get_contents($file));
+        $json = file_get_contents($file);
+        if ($json === false) {
+            throw new \RuntimeException("Unable to read configuration file: $file");
+        }
+        $config = json_decode($json, true);
+        if (!is_array($config)) {
+            throw new \RuntimeException('Configuration must be a JSON object');
+        }
         $configs = [];
         foreach ($config as $googleSpreadsheetId => $spreadsheetConfiguration) {
-            if ($googleSpreadsheetId == '$schema') {
+            if ($googleSpreadsheetId === '$schema') {
                 continue;
             }
+            if (!is_string($googleSpreadsheetId) || !is_array($spreadsheetConfiguration)) {
+                throw new \RuntimeException('Each spreadsheet configuration must be an object');
+            }
             foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
+                if (!is_string($sheetName) || !is_array($configuration)) {
+                    throw new \RuntimeException('Each sheet configuration must be an object');
+                }
+                $targetTable = $configuration['targetTable'] ?? null;
+                if (!is_string($targetTable)) {
+                    throw new \RuntimeException('targetTable must be a string');
+                }
+                $columnMapping = $configuration['columnMapping'] ?? null;
+                if (!is_array($columnMapping)) {
+                    throw new \RuntimeException('columnMapping must be an object');
+                }
+                $mapped = [];
+                foreach ($columnMapping as $out => $in) {
+                    if (!is_string($out) || (!is_string($in) && !is_int($in))) {
+                        throw new \RuntimeException('columnMapping values must be strings or integers');
+                    }
+                    $mapped[$out] = $in;
+                }
+                $headerRow = $configuration['headerRow'] ?? 0;
+                $skipRows = $configuration['skipRows'] ?? 1;
+                if (!is_int($headerRow) || !is_int($skipRows)) {
+                    throw new \RuntimeException('headerRow and skipRows must be integers');
+                }
                 $etlConfig = new EtlConfig();
                 $etlConfig->googleSpreadsheetId = $googleSpreadsheetId;
                 $etlConfig->sheetName = $sheetName;
-                $etlConfig->targetTable = $configuration->targetTable;
-                $etlConfig->columnMapping = (array)($configuration->columnMapping);
-                $etlConfig->headerRow = $configuration->headerRow ?? 0;
-                $etlConfig->skipRows = $configuration->skipRows ?? 1;
+                $etlConfig->targetTable = $targetTable;
+                $etlConfig->columnMapping = $mapped;
+                $etlConfig->headerRow = $headerRow;
+                $etlConfig->skipRows = $skipRows;
                 $configs[] = $etlConfig;
             }
         }

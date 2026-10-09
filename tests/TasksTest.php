@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace fulldecent\GoogleSheetsEtl;
 
+use PHPUnit\Framework\MockObject\Stub;
+
 class TasksTest extends \PHPUnit\Framework\TestCase
 {
+    /** @var GoogleSheetsAgent&Stub */
     private GoogleSheetsAgent $googleSheetsAgent;
+
+    /** @var DatabaseAgent&Stub */
     private DatabaseAgent $databaseAgent;
     private Tasks $tasks;
 

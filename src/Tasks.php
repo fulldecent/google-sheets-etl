@@ -13,7 +13,7 @@ class Tasks
     public DatabaseAgent $databaseAgent;
 
     /**
-     * @var array<EtlConfig>
+     * @var list<EtlConfig>
      */
     public array $etlConfig = [];
 
@@ -35,7 +35,7 @@ class Tasks
     /**
      * Find and account for some updated spreadsheets
      */
-    public function findSomeUpdatedSpreadsheets()
+    public function findSomeUpdatedSpreadsheets(): void
     {
         $lastModified = '2001-01-01T00:00:00Z'; // A time before Google Drive started
         $highestSpreadsheetIdLoadedAtThatTime = '';
@@ -60,7 +60,7 @@ class Tasks
     }
 
     // We must load them in order (cannot skip) because we need to know the oldest one for the next load
-    public function loadSomeUpdatedSpreadsheets()
+    public function loadSomeUpdatedSpreadsheets(): void
     {
         $loadableEtlConfigs = $this->databaseAgent->filterExtractable($this->etlConfig);
         foreach ($loadableEtlConfigs as $etlConfig) {

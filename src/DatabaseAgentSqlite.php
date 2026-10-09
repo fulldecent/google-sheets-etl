@@ -23,26 +23,26 @@ class DatabaseAgentSqlite extends DatabaseAgent
     public function getGreatestModified(): ?array
     {
         $spreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-        $row = $this->database->query(<<<SQL
+        $row = $this->query(<<<SQL
 SELECT google_modified, google_spreadsheet_id
   FROM $spreadsheetsTable
  ORDER BY google_modified DESC, google_spreadsheet_id DESC
  LIMIT 1
 SQL)->fetch(\PDO::FETCH_NUM);
-        return $row === false ? null : $row;
+        return self::modifiedAndId($row);
     }
 
     #[\Override]
     public function getOldestSeen(): ?string
     {
         $spreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-        $spreadsheetId = $this->database->query(<<<SQL
+        $spreadsheetId = $this->query(<<<SQL
 SELECT google_spreadsheet_id
   FROM $spreadsheetsTable
  ORDER BY last_seen, id
  LIMIT 1
 SQL)->fetchColumn();
-        return $spreadsheetId === false ? null : $spreadsheetId;
+        return self::stringOrNull($spreadsheetId);
     }
 
     #[\Override]
@@ -149,7 +149,7 @@ SQL)->execute([
 )
 SQL);
 
-        $existingColumns = $this->database->query($this->tableInfoPragma($targetTable))
+        $existingColumns = $this->query($this->tableInfoPragma($targetTable))
             ->fetchAll(\PDO::FETCH_COLUMN, 1);
         foreach ($this->normalizedColumnNames($columnNames) as $columnName) {
             if (!in_array($columnName, $existingColumns, true)) {
@@ -247,17 +247,27 @@ SQL);
         return $tableName;
     }
 
+    /**
+     * @param list<string> $columns
+     * @return list<string>
+     */
     private function normalizedColumnNames(array $columns): array
     {
         $normalized = [];
         foreach ($columns as $index => $column) {
-            $column = strtolower((string) iconv('UTF-8', 'ASCII//TRANSLIT', $column));
-            $column = trim((string) preg_replace('/[^a-z0-9_ ]/', '', $column));
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
+            if ($converted === false) {
+                throw new \InvalidArgumentException('Unable to normalize column name');
+            }
+            $replaced = preg_replace('/[^a-z0-9_ ]/', '', strtolower($converted));
+            if (!is_string($replaced)) {
+                throw new \InvalidArgumentException('Unable to normalize column name');
+            }
+            $column = trim($replaced);
             if (!preg_match('/^[a-z_]/', $column)) {
                 $column = '_' . $column;
             }
             if (preg_match('/^col_[0-9]+$/', $column)
-                || $column === ''
                 || in_array($column, self::RESERVED_COLUMN_NAMES, true)
                 || in_array($column, $normalized, true)
             ) {
@@ -266,6 +276,34 @@ SQL);
             $normalized[] = $column;
         }
         return $normalized;
+    }
+
+    /**
+     * @param array<int, mixed>|false $row
+     * @return array{0: string, 1: string}|null
+     */
+    private static function modifiedAndId(array|false $row): ?array
+    {
+        if ($row === false) {
+            return null;
+        }
+        $modified = $row[0] ?? null;
+        $id = $row[1] ?? null;
+        if ((!is_string($modified) && !is_int($modified)) || (!is_string($id) && !is_int($id))) {
+            throw new \RuntimeException('Unexpected spreadsheet row');
+        }
+        return [(string) $modified, (string) $id];
+    }
+
+    private static function stringOrNull(mixed $value): ?string
+    {
+        if ($value === false || $value === null) {
+            return null;
+        }
+        if (!is_string($value) && !is_int($value)) {
+            throw new \RuntimeException('Unexpected spreadsheet id');
+        }
+        return (string) $value;
     }
 
     private function tableInfoPragma(string $tableName): string

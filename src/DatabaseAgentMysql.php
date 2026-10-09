@@ -31,8 +31,8 @@ SELECT a.google_modified, a.google_spreadsheet_id
  ORDER BY a.google_modified DESC, a.google_spreadsheet_id DESC
  LIMIT 1
 SQL;
-        $row = $this->database->query($sql)->fetch(\PDO::FETCH_NUM);
-        return $row === false ? null : $row;
+        $row = $this->query($sql)->fetch(\PDO::FETCH_NUM);
+        return self::modifiedAndId($row);
     }
 
     /// @inheritdoc
@@ -46,8 +46,7 @@ SELECT a.google_spreadsheet_id
  ORDER BY a.last_seen
  LIMIT 1
 SQL;
-        $column = $this->database->query($sql)->fetchColumn();
-        return $column === false ? null : $column;
+        return self::stringOrNull($this->query($sql)->fetchColumn());
     }
 
     /// @inheritdoc
@@ -147,10 +146,10 @@ UPDATE google_modified = :google_modified,
        last_seen = :last_seen
 SQL;
         $this->database->prepare($sql)->execute([
-            'google_spreadsheet_id'=>$googleSpreadsheetId,
-            'google_modified'=>$googleModified,
-            'google_spreadsheet_name'=>$name,
-            'last_seen'=>$this->loadTime,
+            'google_spreadsheet_id' => $googleSpreadsheetId,
+            'google_modified' => $googleModified,
+            'google_spreadsheet_name' => $name,
+            'last_seen' => $this->loadTime,
         ]);
     }
 
@@ -184,7 +183,7 @@ SQL;
             }
         }
     }
-    
+
     /// @inheritdoc
     #[\Override]
     public function loadSheet(
@@ -274,24 +273,24 @@ SQL;
         $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
         $sqlOneValueList = implode(',', array_fill(0, count($columnNames) + 2, '?'));
         // Load each row for the selected columns
-        foreach (array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
+        foreach (array_chunk($rows, $this->insertChunkSize(), true) as $rowChunk) {
             $parameters = [];
             foreach ($rowChunk as $i => $row) {
                 array_push($parameters, $etlJobId, $i, ...$row);
             }
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
-/*
-            // If there is an error inserting don't do this.
-            // Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
-            $parameters = array_map(function($v){
-                return is_null($v)
-                    ? null
-                    : is_string($v)
-                        ? substr($v, 0, 100)
-                        : $v;
-            }, $parameters);
-*/
+            /*
+                        // If there is an error inserting don't do this.
+                        // Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
+                        $parameters = array_map(function($v){
+                            return is_null($v)
+                                ? null
+                                : is_string($v)
+                                    ? substr($v, 0, 100)
+                                    : $v;
+                        }, $parameters);
+            */
             $statement->execute($parameters);
             echo '  ' . (array_key_last($rowChunk) + 1);
         }
@@ -329,25 +328,70 @@ SQL;
      *
      * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html identifiers.
      *
-     * @param array $columns
-     * @return array The new column names
+     * @param list<string> $columns
+     * @return list<string> The new column names
      */
     private function normalizedQuotedColumnNames(array $columns): array
     {
         $retval = [];
         foreach ($columns as $index => $column) {
-            $column = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
-            $column = strtolower($column);
-            $column = preg_replace('/[^a-z0-9_ ]/', '', $column);
-            $column = trim($column);
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
+            if ($converted === false) {
+                throw new \InvalidArgumentException('Unable to normalize column name');
+            }
+            $column = strtolower($converted);
+            $replaced = preg_replace('/[^a-z0-9_ ]/', '', $column);
+            if (!is_string($replaced)) {
+                throw new \InvalidArgumentException('Unable to normalize column name');
+            }
+            $column = trim($replaced);
             if (!preg_match('/^[a-z_]/', $column)) {
                 $column = '_' . $column;
             }
-            if (preg_match('/^col_[0-9]+$/', $column) || empty($column) || in_array($column, $retval)) {
+            if (preg_match('/^col_[0-9]+$/', $column) || in_array($column, $retval, true)) {
                 $column = 'col_' . ($index + 1);
             }
             array_push($retval, '`' . $column . '`');
         }
         return $retval;
+    }
+
+    /**
+     * @return int<1, max>
+     */
+    private function insertChunkSize(): int
+    {
+        if ($this->sqlInsertChunkSize < 1) {
+            throw new \InvalidArgumentException('sqlInsertChunkSize must be at least 1');
+        }
+        return $this->sqlInsertChunkSize;
+    }
+
+    /**
+     * @param array<int, mixed>|false $row
+     * @return array{0: string, 1: string}|null
+     */
+    private static function modifiedAndId(array|false $row): ?array
+    {
+        if ($row === false) {
+            return null;
+        }
+        $modified = $row[0] ?? null;
+        $id = $row[1] ?? null;
+        if ((!is_string($modified) && !is_int($modified)) || (!is_string($id) && !is_int($id))) {
+            throw new \RuntimeException('Unexpected spreadsheet row');
+        }
+        return [(string) $modified, (string) $id];
+    }
+
+    private static function stringOrNull(mixed $value): ?string
+    {
+        if ($value === false || $value === null) {
+            return null;
+        }
+        if (!is_string($value) && !is_int($value)) {
+            throw new \RuntimeException('Unexpected spreadsheet id');
+        }
+        return (string) $value;
     }
 }

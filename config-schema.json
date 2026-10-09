@@ -1,9 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": [
-    "$schema"
-  ],
+  "required": ["$schema"],
   "propertyNames": {
     "pattern": "^([0-9a-zA-Z_/-]{44})|\\$schema$",
     "title": "A spreadsheet to load"

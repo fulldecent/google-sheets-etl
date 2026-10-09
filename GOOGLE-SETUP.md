@@ -8,7 +8,7 @@ Use your Gmail account or corporate account.
 
 ## Create a Cloud Platform project
 
-1. Start at https://console.cloud.google.com/ and create a project
+1. Start at <https://console.cloud.google.com/> and create a project
    ![1 create project](./GOOGLE-SETUP.assets/1 create project.png)
 
 2. Open that project (it takes a moment to load)

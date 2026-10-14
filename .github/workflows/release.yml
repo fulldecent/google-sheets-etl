@@ -114,10 +114,22 @@ jobs:
         id: tag
         env:
           TAG: ${{ inputs.tag || needs.propose.outputs.tag_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=${TAG#v}
           if [ "$TAG" = "$version" ] || ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "tag must look like v1.2.3" >&2
+            exit 1
+          fi
+          # gh release create --target does not move a tag that already exists.
+          # Publishing this build onto that tag would attest a different commit.
+          if resolved=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha); then
+            if [ "$resolved" != "$GITHUB_SHA" ]; then
+              echo "tag $TAG points at $resolved, not $GITHUB_SHA" >&2
+              exit 1
+            fi
+          elif gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --silent >/dev/null; then
+            echo "unable to resolve tag $TAG" >&2
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -163,11 +175,21 @@ jobs:
             --generate-notes \
             --latest
 
+      # After gh release create. A failed publish leaves autorelease: pending in place.
+      # A manual dispatch skips propose, so the merged release pull request is found by title.
       - name: Mark the release pull request tagged
-        if: needs.propose.outputs.pr != ''
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ needs.propose.outputs.pr }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
+          if [ -z "$PR" ]; then
+            PR=$(gh api -X GET search/issues \
+              -f q="repo:${GITHUB_REPOSITORY} is:pr is:merged label:\"autorelease: pending\"" \
+              --jq "[.items[] | select((.title | capture(\"release (?<v>[0-9]+[.][0-9]+[.][0-9]+)\")? | .v) == \"$VERSION\")] | .[0].number // \"\"")
+          fi
+          if [ -z "$PR" ]; then
+            exit 0
+          fi
           gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PR/labels/autorelease:%20pending"
           gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" -f "labels[]=autorelease: tagged"

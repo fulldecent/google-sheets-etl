@@ -53,7 +53,11 @@ class EtlConfig
                 throw new \RuntimeException('Each spreadsheet configuration must be an object');
             }
             foreach ($spreadsheetConfiguration as $sheetName => $configuration) {
-                if (!is_string($sheetName) || !is_array($configuration)) {
+                // json_decode turns a numeric object key such as "2026" into an int.
+                if (is_int($sheetName)) {
+                    $sheetName = (string) $sheetName;
+                }
+                if (!is_array($configuration)) {
                     throw new \RuntimeException('Each sheet configuration must be an object');
                 }
                 $targetTable = $configuration['targetTable'] ?? null;

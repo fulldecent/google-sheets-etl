@@ -18,10 +18,17 @@ class EtlConfigTest extends \PHPUnit\Framework\TestCase
 
     public function testZeroColumnIndexIsAccepted(): void
     {
-        $configs = EtlConfig::fromFile($this->writeConfig(['name' => 0, 'email' => 'Email']));
+        $configs = EtlConfig::fromFile($this->writeConfig(['name' => 0, 'email' => 'Email'], 'People'));
 
         self::assertCount(1, $configs);
         self::assertSame(['name' => 0, 'email' => 'Email'], $configs[0]->columnMapping);
+    }
+
+    public function testNumericSheetNameIsAccepted(): void
+    {
+        $configs = EtlConfig::fromFile($this->writeConfig(['name' => 'Name'], '2026'));
+
+        self::assertSame('2026', $configs[0]->sheetName);
     }
 
     public function testNegativeColumnIndexIsRejected(): void
@@ -29,13 +36,13 @@ class EtlConfigTest extends \PHPUnit\Framework\TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('columnMapping integer values must be zero or greater');
 
-        EtlConfig::fromFile($this->writeConfig(['name' => -1]));
+        EtlConfig::fromFile($this->writeConfig(['name' => -1], 'People'));
     }
 
     /**
      * @param array<string, int|string> $columnMapping
      */
-    private function writeConfig(array $columnMapping): string
+    private function writeConfig(array $columnMapping, string $sheetName): string
     {
         $file = tempnam(sys_get_temp_dir(), 'etl');
         if ($file === false) {
@@ -45,7 +52,7 @@ class EtlConfigTest extends \PHPUnit\Framework\TestCase
         $written = file_put_contents($file, json_encode([
             '$schema' => './config-schema.json',
             str_repeat('a', 44) => [
-                'People' => [
+                $sheetName => [
                     'targetTable' => 'people',
                     'columnMapping' => $columnMapping,
                 ],

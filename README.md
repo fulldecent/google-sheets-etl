@@ -41,7 +41,7 @@ vendor/bin/php-cs-fixer fix
 With an actively maintained version of Node.js installed, correct other formatting issues before sending proposed changes:
 
 ```sh
-npx prettier@latest --check . --write
+npx prettier@latest --write .
 npx markdownlint-cli@latest "**/*.md" --fix
 ```
 

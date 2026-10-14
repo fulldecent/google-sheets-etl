@@ -115,12 +115,13 @@ jobs:
         env:
           TAG: ${{ inputs.tag || needs.propose.outputs.tag_name }}
         run: |
-          case "$TAG" in
-            v*.*.*) ;;
-            *) echo "tag must look like v1.2.3" >&2; exit 1 ;;
-          esac
+          version=${TAG#v}
+          if [ "$TAG" = "$version" ] || ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "tag must look like v1.2.3" >&2
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Attest the version
         id: version

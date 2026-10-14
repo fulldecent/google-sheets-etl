@@ -69,6 +69,11 @@ class EtlConfig
                     if (!is_string($out) || (!is_string($in) && !is_int($in))) {
                         throw new \RuntimeException('columnMapping values must be strings or integers');
                     }
+                    // config-schema.json sets minimum 0. A negative index passes
+                    // RowsOfColumns's length check and is loaded as null.
+                    if (is_int($in) && $in < 0) {
+                        throw new \RuntimeException('columnMapping integer values must be zero or greater');
+                    }
                     $mapped[$out] = $in;
                 }
                 $headerRow = $configuration['headerRow'] ?? 0;

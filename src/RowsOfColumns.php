@@ -45,7 +45,7 @@ class RowsOfColumns
         $row = $this->rowsOfColumns[$headerRow];
         foreach ($specifiers as $specifier) {
             if (is_int($specifier)) {
-                if ($specifier < count($row)) {
+                if ($specifier >= 0 && $specifier < count($row)) {
                     $retval[] = $specifier;
                 } else {
                     throw new \Exception("Column index out of bounds: $specifier");

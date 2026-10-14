@@ -63,14 +63,19 @@ jobs:
           name=${raw##*/}
           composer archive --format=zip --dir=dist --file="$name"
 
+      # A pull request, including one from a fork, does not receive the OIDC
+      # token actions/attest requires. The release workflow does not download
+      # artifacts from a pull request run.
       - name: Attest the build
         id: attest
+        if: github.event_name != 'pull_request'
         uses: actions/attest@v4
         with:
           subject-path: dist/*
 
       # After attesting, so the bundle is not one of its own subjects.
       - name: Add the attestation to the build
+        if: github.event_name != 'pull_request'
         env:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: cp "$BUNDLE" dist/attestation.sigstore.json

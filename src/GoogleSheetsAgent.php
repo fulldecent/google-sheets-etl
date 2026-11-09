@@ -40,8 +40,8 @@ class GoogleSheetsAgent
             function (
                 $retries,
                 Request $request,
-                ResponseInterface $response = null,
-                \Throwable $exception = null
+                ?ResponseInterface $response = null,
+                ?\Throwable $exception = null
             ) use ($maxRetries) {
                 // Retry on server errors (5xx) or on connection errors (e.g., timeouts)
                 if ($retries >= $maxRetries) {

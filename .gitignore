@@ -1,12 +1,34 @@
-# From https://github.com/github/gitignore/blob/master/Composer.gitignore
+# macOS
+.DS_Store
+
+# Secrets. .env.example is the committed sample.
+.env
+.env.*
+!.env.example
+
+# https://github.com/github/gitignore/blob/main/Composer.gitignore
 composer.phar
 /vendor/
 
-# Commit your application's lock file https://getcomposer.org/doc/01-basic-usage.md#commit-your-composer-lock-file-to-version-control
-# You may choose to ignore a library lock file http://getcomposer.org/doc/02-libraries.md#lock-file
-# composer.lock
+# Commit composer.lock. A library may ignore it.
+# https://getcomposer.org/doc/02-libraries.md#lock-file
+# This project commits it so CI installs the same dev tools every time.
+# `composer archive` leaves it out via .gitattributes.
 
-# google-sheets-etl specific additions
+# PHPUnit
+.phpunit.cache
+.phpunit.result.cache
+
+# php-cs-fixer
+.php-cs-fixer.cache
+
+# PHPStan
+.phpstan.cache
+
+# Release artifacts
+/dist/
+
+# Service account keys and local databases
 *google*json
 *.db
 /local
@@ -14,10 +36,3 @@ composer.phar
 
 # Ant
 /build
-
-# Extra files
-/.phpunit.result.cache
-/.phpunit.cache/
-
-# php-cs-fixer
-.php-cs-fixer.cache

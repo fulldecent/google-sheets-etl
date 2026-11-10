@@ -1,0 +1,84 @@
+# Build and test
+#
+# Install, test, pack, and SLSA attest the project.
+#
+# This workflow produces the following things which release.yml consumes:
+#   1. $.jobs.build-test (this exact job ID)
+#   2. The artifact named "build"
+#
+# shivammathur/setup-php is not a GitHub-supported Action. It is how CI installs
+# the version in .php-version. Ubuntu's php package does not read that file.
+# https://github.com/shivammathur/setup-php
+#
+# Public repositories can use attest for free. Private repos require Enterprise Cloud.
+
+name: Build and test
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out this commit
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version-file: .php-version
+          coverage: none
+          tools: composer
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Check PHP
+        run: composer check
+
+      - name: Test
+        run: composer test
+
+      # The zip name is the composer package name, after the vendor slash.
+      # fulldecent/cents becomes cents.zip. A package that copies this workflow
+      # keeps its own composer.json name and does not edit this step.
+      - name: Pack
+        run: |
+          mkdir -p dist
+          raw=$(composer config name)
+          name=${raw##*/}
+          composer archive --format=zip --dir=dist --file="$name"
+
+      - name: Attest the build
+        id: attest
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*
+
+      # After attesting, so the bundle is not one of its own subjects.
+      - name: Add the attestation to the build
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" dist/attestation.sigstore.json
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v7
+        with:
+          name: build
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

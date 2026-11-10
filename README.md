@@ -14,32 +14,32 @@ php bin/google-sheets-etl credentials.json etl.json "sqlite:warehouse.db"
 
 You will need Git, PHP at the version in [.php-version](.php-version), Composer 2, and the PHP extensions `curl`, `iconv`, `json`, `openssl`, `pdo`, `dom`, `mbstring`, `tokenizer`, `xml`, `xmlwriter` and `zip`. Loading a database also needs `pdo_mysql` or `pdo_sqlite`. The test suite uses `pdo_sqlite`. Open a terminal (PowerShell on Windows) and use the instructions for your operating system.
 
-The PHP version below is 8.3 because that is what [.php-version](.php-version) says. When that file changes, change these commands with it. CI installs that same version with [shivammathur/setup-php](https://github.com/shivammathur/setup-php). A distribution package named `php` that ignores the file is the wrong PHP.
+The PHP version below is 8.4 because that is the oldest branch in active support, and that is what [.php-version](.php-version) says. When that file changes, change these commands with it. CI runs the test job on every branch in the matrix in [build-test.yml](.github/workflows/build-test.yml). The pack job installs the version in that file with [shivammathur/setup-php](https://github.com/shivammathur/setup-php). A distribution package named `php` that ignores the file is the wrong PHP for local setup.
 
 > [!WARNING]
 > Do not install PHP or Composer by piping a downloaded script into a shell. The commands below use a package manager, or a named archive for the current PHP packages.
 
 ### Linux
 
-On Ubuntu 22.04+ or Debian 12+, install PHP 8.3 from the [Ondřej Surý PHP archive](https://launchpad.net/~ondrej/+archive/ubuntu/php):
+On Ubuntu 22.04+ or Debian 12+, install PHP 8.4 from the [Ondřej Surý PHP archive](https://launchpad.net/~ondrej/+archive/ubuntu/php):
 
 ```sh
 sudo apt update
 sudo apt install -y ca-certificates software-properties-common
 sudo add-apt-repository -y ppa:ondrej/php
 sudo apt update
-sudo apt install -y git php8.3-cli php8.3-xml php8.3-mbstring php8.3-zip php8.3-curl php8.3-sqlite3 php8.3-mysql unzip composer
-sudo update-alternatives --set php /usr/bin/php8.3
+sudo apt install -y git php8.4-cli php8.4-xml php8.4-mbstring php8.4-zip php8.4-curl php8.4-sqlite3 php8.4-mysql unzip composer
+sudo update-alternatives --set php /usr/bin/php8.4
 ```
 
-`php8.3-xml` provides `dom`, `tokenizer`, `xml` and `xmlwriter`. `php8.3-sqlite3` provides `pdo_sqlite`. `php8.3-mysql` provides `pdo_mysql`.
+`php8.4-xml` provides `dom`, `tokenizer`, `xml` and `xmlwriter`. `php8.4-sqlite3` provides `pdo_sqlite`. `php8.4-mysql` provides `pdo_mysql`.
 
-On Fedora, install PHP 8.3 from the [Remi repository](https://rpms.remirepo.net/wizard/):
+On Fedora, install PHP 8.4 from the [Remi repository](https://rpms.remirepo.net/wizard/):
 
 ```sh
 sudo dnf install -y https://rpms.remirepo.net/fedora/remi-release-$(rpm -E %fedora).rpm
 sudo dnf module reset -y php
-sudo dnf module enable -y php:remi-8.3
+sudo dnf module enable -y php:remi-8.4
 sudo dnf install -y git php-cli php-xml php-mbstring php-zip php-pdo php-mysqlnd php-sqlite3 composer
 ```
 
@@ -51,22 +51,22 @@ Install Apple's Command Line Tools if they are not already installed:
 xcode-select --install
 ```
 
-Complete the installation dialog. With Homebrew installed, install Git, PHP 8.3 and Composer:
+Complete the installation dialog. With Homebrew installed, install Git, PHP 8.4 and Composer:
 
 ```sh
-brew install git php@8.3 composer
-brew link --overwrite --force php@8.3
+brew install git php@8.4 composer
+brew link --overwrite --force php@8.4
 ```
 
-[php@8.3](https://formulae.brew.sh/formula/php@8.3) stays on PHP 8.3. Homebrew's unversioned `php` formula moves to the next release on its own, so it will not keep matching [.php-version](.php-version). `brew link` is what puts that `php` on your `PATH`.
+[php@8.4](https://formulae.brew.sh/formula/php@8.4) stays on PHP 8.4. Homebrew's unversioned `php` formula moves to the next release on its own, so it will not keep matching [.php-version](.php-version). `brew link` is what puts that `php` on your `PATH`.
 
 ### Windows
 
-Use winget to install Git, the non-thread-safe PHP 8.3 build (the CLI build) and Composer. Open a new PowerShell window after installation so `PATH` is current.
+Use winget to install Git, the non-thread-safe PHP 8.4 build (the CLI build) and Composer. Open a new PowerShell window after installation so `PATH` is current.
 
 ```powershell
 winget install --exact --id Git.Git
-winget install --exact --id PHP.PHP.NTS.8.3
+winget install --exact --id PHP.PHP.NTS.8.4
 winget install --exact --id Composer.Composer
 ```
 
@@ -148,7 +148,7 @@ The program writes progress to standard output. A missing argument prints usage 
 
 Thank you for taking an interest in improving Google Sheets ETL and the programs of people using it!
 
-Follow the installation instructions above to get Git, PHP 8.3 and Composer. Work from the project directory. The implementation is in [src/](src/) and [bin/google-sheets-etl](bin/google-sheets-etl). You can run it without a global install:
+Follow the installation instructions above to get Git, PHP 8.4 and Composer. Work from the project directory. The implementation is in [src/](src/) and [bin/google-sheets-etl](bin/google-sheets-etl). You can run it without a global install:
 
 ```sh
 php bin/google-sheets-etl credentials.json etl.json "sqlite:warehouse.db"
@@ -158,7 +158,7 @@ Commit [composer.lock](composer.lock) so the development tools stay reproducible
 
 There is no `version` field in [composer.json](composer.json). Packagist and the release workflow take the version from the git tag. A `version` field in the manifest fights the tag.
 
-[composer.json](composer.json) sets `config.platform.php` to `8.3.99`. A checkout can run a newer PHP than the `^8.3` constraint. Without that pin, `composer update` can lock a dependency that requires the newer PHP, and CI fails when it installs the version in [.php-version](.php-version).
+[composer.json](composer.json) requires `>=8.4 <8.6` and sets `config.platform.php` to `8.4.99`. `8.4.99` is the newest patch Composer will assume for the oldest supported branch. A checkout can run a newer PHP than that branch. Without the pin, `composer update` can lock a dependency that requires the newer PHP, and the 8.4 test job fails when it installs the lock.
 
 ### Testing
 
@@ -207,7 +207,15 @@ The release workflow needs repository settings under Actions, General, Workflow 
 The project administrator completes these maintenance tasks each month. If they are 3+ months late, please remind them or send your own issue/pull request.
 
 1. Identify external Actions in [.github/workflows](.github/workflows) and look for available new versions. Review and update them if it is safe. GitHub-supported Actions (under the actions/ organization) may require only cursory review. [shivammathur/setup-php](https://github.com/shivammathur/setup-php) and [googleapis/release-please-action](https://github.com/googleapis/release-please-action) are not in that organization, so read their changelogs.
-1. Review the PHP version in [.php-version](.php-version) and the `php` constraint in [composer.json](composer.json). Update the installation instructions when that version changes. `8.3` means the newest PHP 8.3 patch.
+1. Review which PHP branches are in active support on the [supported versions](https://www.php.net/supported-versions.php) page. A branch in security support only, or past its end of life, is not supported. Each branch that is in active support must pass the test job. The `php` matrix in [build-test.yml](.github/workflows/build-test.yml) is that list.
+
+   To change the set:
+
+   1. Set `require.php` in [composer.json](composer.json) to `>=X.Y <Z.W`. `X.Y` is the oldest branch still in active support. `Z.W` is the next branch after the newest one in active support, so a branch that is not yet in active support is rejected.
+   1. Set `config.platform.php` to `X.Y.99` and set [.php-version](.php-version) to `X.Y`. `X.Y` in that file means the newest patch of that branch.
+   1. Set `matrix.php` in [build-test.yml](.github/workflows/build-test.yml) to every branch in active support. Leave the pack job id as `build-test` and leave the uploaded artifact named `build`. The release workflow downloads that artifact.
+   1. Change the installation commands in this file to `X.Y`.
+   1. Run `composer update` so [composer.lock](composer.lock) matches the platform pin. `composer check` and `composer test` must pass on each version in the matrix before the change is merged.
 1. Review direct dependencies with `composer outdated --direct`.
 
 ## Project scope

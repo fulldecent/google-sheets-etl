@@ -329,8 +329,8 @@ SQL;
      *
      * @see https://dev.mysql.com/doc/refman/8.0/en/identifiers.html identifiers.
      *
-     * @param array $columns
-     * @return array The new column names
+     * @param list<string> $columns
+     * @return list<string> The new column names
      */
     private function normalizedQuotedColumnNames(array $columns): array
     {

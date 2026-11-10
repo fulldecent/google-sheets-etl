@@ -12,6 +12,8 @@ class EtlConfig
     public string $googleSpreadsheetId;
     public string $sheetName;
     public string $targetTable;
+
+    /** @var array<string, string|int> */
     public array $columnMapping;
     public int $headerRow = 0;
     public int $skipRows = 1;
@@ -28,8 +30,8 @@ class EtlConfig
      *     "skipRows": 1
      * }
      *
-     * @param $file JSON configuration file conforming to config-schema.json
-     * @return array of EtlConfig
+     * @param string $file JSON configuration file conforming to config-schema.json
+     * @return list<EtlConfig>
      */
     public static function fromFile($file): array
     {

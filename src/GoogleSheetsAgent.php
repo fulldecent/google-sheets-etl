@@ -89,7 +89,7 @@ class GoogleSheetsAgent
      * @param string $id           limit for files to search
      * @param int    $count        limit number of results
      *
-     * @return array Array with elements ID -> modifiedTime (RFC 3339 format)
+     * @return array<string, object{modifiedTime: string, name: string}> ID to modified time (RFC 3339) and name
      *
      * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339
@@ -133,7 +133,7 @@ class GoogleSheetsAgent
      *
      * @param string $id Which Google Spreadsheet ID to search
      *
-        * @return ?object Object containing (modifiedTime, name), or null if not found
+     * @return object{modifiedTime: string, name: string}|null
      *
      * @see https://developers.google.com/drive/api/v3/reference/files/list
      * @see https://tools.ietf.org/html/rfc3339

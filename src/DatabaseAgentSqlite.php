@@ -247,6 +247,10 @@ SQL);
         return $tableName;
     }
 
+    /**
+     * @param list<string> $columns
+     * @return list<string>
+     */
     private function normalizedColumnNames(array $columns): array
     {
         $normalized = [];

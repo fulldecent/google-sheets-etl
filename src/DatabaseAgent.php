@@ -91,7 +91,7 @@ abstract class DatabaseAgent
      *
      * @see https://tools.ietf.org/html/rfc3339
      *
-     * @return ?array like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
+     * @return array{0: string, 1: string}|null like ['2015-01-01 03:04:05', '1-Dcs8ZYoyz82xkjkv3tIbSCAJOOpouXur4dwql4TqiY']
      */
     abstract public function getGreatestModified(): ?array;
 
@@ -131,6 +131,8 @@ abstract class DatabaseAgent
 
     /**
      * Create table to prepare for load sheet
+     *
+     * @param list<string> $columnNames
      */
     abstract public function createTable(string $targetTable, array $columnNames): void;
 
@@ -140,6 +142,9 @@ abstract class DatabaseAgent
      *
      * @apiSpec This operation shall be atomic, no partial effect may occur on the database if program is prematurely
      *          exited.
+     *
+     * @param list<string> $columnNames
+     * @param list<list<string|null>> $rows
      */
     abstract public function loadSheet(
         string $googleSpreadsheetId,

@@ -12,9 +12,13 @@ namespace fulldecent\GoogleSheetsEtl;
  */
 class RowsOfColumns
 {
+    /** @var array<int, array<int, string>> */
     private array $rowsOfColumns;
     public string $hash;
 
+    /**
+     * @param array<int, array<int, string>> $values
+     */
     public function __construct(array $values, string $hash)
     {
         $temp = [];
@@ -30,9 +34,9 @@ class RowsOfColumns
     /**
      * Gets column selectors for the specified names from a header row
      *
-     * @param array   $specifiers indicies (zero-indexed) or names of columns
-     * @param integer $headerRow  which row (zero-indexed) to retrieve from
-     * @return array              columns (zero-indexed) for names specified
+     * @param array<string, string|int> $specifiers indicies (zero-indexed) or names of columns
+     * @param int $headerRow which row (zero-indexed) to retrieve from
+     * @return list<int> columns (zero-indexed) for names specified
      */
     public function getColumnSelectorsFromHeaderRow(array $specifiers, int $headerRow = 0): array
     {
@@ -62,10 +66,10 @@ class RowsOfColumns
     /**
      * Return a two-dimensional array of values
      *
-     * @param array   $columnSelectors specifyies which columns (zero-indexed)
-     *                                 to extract from each row of source data
-     * @param integer $skipRows        number of rows to skip from source data
-     * @return array                   rows, each containing an array (columns) of values
+     * @param list<int> $columnSelectors specifyies which columns (zero-indexed)
+     *                                  to extract from each row of source data
+     * @param int $skipRows number of rows to skip from source data
+     * @return list<list<string|null>> rows, each containing an array (columns) of values
      */
     public function getRows(array $columnSelectors, int $skipRows = 1): array
     {

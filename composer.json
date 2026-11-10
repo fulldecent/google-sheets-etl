@@ -16,8 +16,8 @@
         "google/apiclient": "^2.17"
     },
     "require-dev": {
-        "phpunit/phpunit" : "^12.5",
-        "squizlabs/php_codesniffer": "^4.0"
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "phpunit/phpunit": "^12.5"
     },
     "autoload": {
         "psr-4": {"fulldecent\\GoogleSheetsEtl\\": "src/"}
@@ -25,9 +25,14 @@
     "autoload-dev": {
         "psr-4": {"fulldecent\\GoogleSheetsEtl\\": "tests/"}
     },
+    "config": {
+        "platform": {
+            "php": "8.3.99"
+        }
+    },
     "scripts": {
-        "test": "phpunit",
-        "check-style": "./vendor/bin/phpcs src tests",
-        "fix-style": "./vendor/bin/phpcbf src tests"
+        "check": "php-cs-fixer fix --dry-run --diff",
+        "fix-style": "php-cs-fixer fix",
+        "test": "phpunit"
     }
 }

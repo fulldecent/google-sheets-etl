@@ -17,6 +17,13 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: "8.3"
+        coverage: none
+        tools: composer
+
     - name: Validate composer.json and composer.lock
       run: composer validate --strict
 
@@ -32,8 +39,8 @@ jobs:
     - name: Install dependencies
       run: composer install --prefer-dist --no-progress
 
-    - name: Run link
-      run: composer run-script check-style
+    - name: Check PSR-12
+      run: composer check
 
     - name: Run test suite
-      run: composer run-script test
+      run: composer test

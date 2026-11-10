@@ -50,7 +50,7 @@ class RowsOfColumns
                     throw new \Exception("Column index out of bounds: $specifier");
                 }
             } elseif (is_string($specifier)) {
-//                $selector = array_search(strtolower($specifier), array_map('strtolower',$row), true);
+                //                $selector = array_search(strtolower($specifier), array_map('strtolower',$row), true);
                 $selector = array_search($specifier, $row, true);
                 if ($selector === false) {
                     throw new \Exception('Required column not found: ' . $specifier);

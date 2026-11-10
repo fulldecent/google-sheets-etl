@@ -123,7 +123,7 @@ class GoogleSheetsAgent
                     continue;
                 }
             }
-            $retval[$file->getId()] = (object)['modifiedTime'=>$file->getModifiedTime(), 'name'=>$file->getName()];
+            $retval[$file->getId()] = (object)['modifiedTime' => $file->getModifiedTime(), 'name' => $file->getName()];
         }
         return $retval;
     }
@@ -149,7 +149,7 @@ class GoogleSheetsAgent
             'supportsAllDrives' => 'true',
         ]);
         if ($result) {
-            return (object)['modifiedTime'=>$result->getModifiedTime(), 'name'=>$result->getName()];
+            return (object)['modifiedTime' => $result->getModifiedTime(), 'name' => $result->getName()];
         }
         return null;
     }

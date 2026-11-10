@@ -147,10 +147,10 @@ UPDATE google_modified = :google_modified,
        last_seen = :last_seen
 SQL;
         $this->database->prepare($sql)->execute([
-            'google_spreadsheet_id'=>$googleSpreadsheetId,
-            'google_modified'=>$googleModified,
-            'google_spreadsheet_name'=>$name,
-            'last_seen'=>$this->loadTime,
+            'google_spreadsheet_id' => $googleSpreadsheetId,
+            'google_modified' => $googleModified,
+            'google_spreadsheet_name' => $name,
+            'last_seen' => $this->loadTime,
         ]);
     }
 
@@ -184,7 +184,7 @@ SQL;
             }
         }
     }
-    
+
     /// @inheritdoc
     #[\Override]
     public function loadSheet(
@@ -281,17 +281,17 @@ SQL;
             }
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
-/*
-            // If there is an error inserting don't do this.
-            // Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
-            $parameters = array_map(function($v){
-                return is_null($v)
-                    ? null
-                    : is_string($v)
-                        ? substr($v, 0, 100)
-                        : $v;
-            }, $parameters);
-*/
+            /*
+                        // If there is an error inserting don't do this.
+                        // Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
+                        $parameters = array_map(function($v){
+                            return is_null($v)
+                                ? null
+                                : is_string($v)
+                                    ? substr($v, 0, 100)
+                                    : $v;
+                        }, $parameters);
+            */
             $statement->execute($parameters);
             echo '  ' . (array_key_last($rowChunk) + 1);
         }

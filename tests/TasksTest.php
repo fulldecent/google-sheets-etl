@@ -6,8 +6,12 @@ namespace fulldecent\GoogleSheetsEtl;
 
 class TasksTest extends \PHPUnit\Framework\TestCase
 {
+    /** @var GoogleSheetsAgent&\PHPUnit\Framework\MockObject\Stub */
     private GoogleSheetsAgent $googleSheetsAgent;
+
+    /** @var DatabaseAgent&\PHPUnit\Framework\MockObject\Stub */
     private DatabaseAgent $databaseAgent;
+
     private Tasks $tasks;
 
     #[\Override]

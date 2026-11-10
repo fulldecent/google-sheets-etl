@@ -23,26 +23,29 @@ class DatabaseAgentSqlite extends DatabaseAgent
     public function getGreatestModified(): ?array
     {
         $spreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-        $row = $this->database->query(<<<SQL
+        $row = $this->query(<<<SQL
 SELECT google_modified, google_spreadsheet_id
   FROM $spreadsheetsTable
  ORDER BY google_modified DESC, google_spreadsheet_id DESC
  LIMIT 1
 SQL)->fetch(\PDO::FETCH_NUM);
-        return $row === false ? null : $row;
+        if (!is_array($row) || !is_string($row[0]) || !is_string($row[1])) {
+            return null;
+        }
+        return [$row[0], $row[1]];
     }
 
     #[\Override]
     public function getOldestSeen(): ?string
     {
         $spreadsheetsTable = $this->quotedFullyQualifiedTableName(self::SPREADSHEETS_TABLE);
-        $spreadsheetId = $this->database->query(<<<SQL
+        $spreadsheetId = $this->query(<<<SQL
 SELECT google_spreadsheet_id
   FROM $spreadsheetsTable
  ORDER BY last_seen, id
  LIMIT 1
 SQL)->fetchColumn();
-        return $spreadsheetId === false ? null : $spreadsheetId;
+        return is_string($spreadsheetId) ? $spreadsheetId : null;
     }
 
     #[\Override]
@@ -149,7 +152,7 @@ SQL)->execute([
 )
 SQL);
 
-        $existingColumns = $this->database->query($this->tableInfoPragma($targetTable))
+        $existingColumns = $this->query($this->tableInfoPragma($targetTable))
             ->fetchAll(\PDO::FETCH_COLUMN, 1);
         foreach ($this->normalizedColumnNames($columnNames) as $columnName) {
             if (!in_array($columnName, $existingColumns, true)) {
@@ -255,13 +258,14 @@ SQL);
     {
         $normalized = [];
         foreach ($columns as $index => $column) {
-            $column = strtolower((string) iconv('UTF-8', 'ASCII//TRANSLIT', $column));
-            $column = trim((string) preg_replace('/[^a-z0-9_ ]/', '', $column));
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
+            $column = strtolower($converted === false ? '' : $converted);
+            $replaced = preg_replace('/[^a-z0-9_ ]/', '', $column);
+            $column = trim($replaced ?? '');
             if (!preg_match('/^[a-z_]/', $column)) {
                 $column = '_' . $column;
             }
             if (preg_match('/^col_[0-9]+$/', $column)
-                || $column === ''
                 || in_array($column, self::RESERVED_COLUMN_NAMES, true)
                 || in_array($column, $normalized, true)
             ) {

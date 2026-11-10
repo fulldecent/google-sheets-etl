@@ -17,6 +17,7 @@
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.64",
+        "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.5"
     },
     "autoload": {
@@ -31,7 +32,10 @@
         }
     },
     "scripts": {
-        "check": "php-cs-fixer fix --dry-run --diff",
+        "check": [
+            "php-cs-fixer fix --dry-run --diff",
+            "phpstan analyse --no-progress --memory-limit=1G"
+        ],
         "fix-style": "php-cs-fixer fix",
         "test": "phpunit"
     }

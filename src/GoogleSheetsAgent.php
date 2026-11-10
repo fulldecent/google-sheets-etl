@@ -7,7 +7,6 @@ namespace fulldecent\GoogleSheetsEtl;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Exception\TransferException;
 use Psr\Http\Message\ResponseInterface;
 
@@ -18,8 +17,6 @@ class GoogleSheetsAgent
 {
     private string $credentialsFile;
     private \Google_Client $googleClient;
-    private float $loadTime;
-    private int $numberOfRequestsThisSession = 0;
 
     public function __construct(string $newCredentialsFile)
     {
@@ -38,11 +35,11 @@ class GoogleSheetsAgent
         $maxRetries = 5;
         $retryMiddleware = Middleware::retry(
             function (
-                $retries,
-                Request $request,
+                int $retries,
+                \Psr\Http\Message\RequestInterface $request,
                 ?ResponseInterface $response = null,
-                ?\Throwable $exception = null
-            ) use ($maxRetries) {
+                mixed $exception = null
+            ) use ($maxRetries): bool {
                 // Retry on server errors (5xx) or on connection errors (e.g., timeouts)
                 if ($retries >= $maxRetries) {
                     return false; // Stop retrying after reaching max retries
@@ -70,12 +67,18 @@ class GoogleSheetsAgent
         ]);
         $this->googleClient->setHttpClient($httpClient);
         $this->googleClient->setAuthConfig($this->credentialsFile);
-        $this->loadTime = microtime(true);
     }
 
-    public function getAccountName()
+    public function getAccountName(): string
     {
-        $config = json_decode(file_get_contents($this->credentialsFile));
+        $credentialsJson = file_get_contents($this->credentialsFile);
+        if ($credentialsJson === false) {
+            throw new \RuntimeException("Unable to read credentials file: {$this->credentialsFile}");
+        }
+        $config = json_decode($credentialsJson);
+        if (!is_object($config) || !isset($config->client_email) || !is_string($config->client_email)) {
+            throw new \RuntimeException('Credentials JSON has no client_email');
+        }
         return $config->client_email;
     }
 
@@ -123,7 +126,10 @@ class GoogleSheetsAgent
                     continue;
                 }
             }
-            $retval[$file->getId()] = (object)['modifiedTime' => $file->getModifiedTime(), 'name' => $file->getName()];
+            $retval[$file->getId()] = (object) [
+                'modifiedTime' => (string) $file->getModifiedTime(),
+                'name' => (string) $file->getName(),
+            ];
         }
         return $retval;
     }
@@ -149,7 +155,10 @@ class GoogleSheetsAgent
             'supportsAllDrives' => 'true',
         ]);
         if ($result) {
-            return (object)['modifiedTime' => $result->getModifiedTime(), 'name' => $result->getName()];
+            return (object) [
+                'modifiedTime' => (string) $result->getModifiedTime(),
+                'name' => (string) $result->getName(),
+            ];
         }
         return null;
     }
@@ -171,7 +180,11 @@ class GoogleSheetsAgent
 
         // Collect row data from sheet
         $response = $googleService->spreadsheets_values->get($spreadsheetId, $sheetName);
-        $sha256Hash = hash('sha256', json_encode($response->getValues()));
-        return new RowsOfColumns($response->getValues(), $sha256Hash);
+        $values = $response->getValues() ?? [];
+        $encoded = json_encode($values);
+        if ($encoded === false) {
+            throw new \RuntimeException('Unable to hash sheet values');
+        }
+        return new RowsOfColumns($values, hash('sha256', $encoded));
     }
 }

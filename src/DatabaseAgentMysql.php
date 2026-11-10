@@ -31,8 +31,11 @@ SELECT a.google_modified, a.google_spreadsheet_id
  ORDER BY a.google_modified DESC, a.google_spreadsheet_id DESC
  LIMIT 1
 SQL;
-        $row = $this->database->query($sql)->fetch(\PDO::FETCH_NUM);
-        return $row === false ? null : $row;
+        $row = $this->query($sql)->fetch(\PDO::FETCH_NUM);
+        if (!is_array($row) || !is_string($row[0]) || !is_string($row[1])) {
+            return null;
+        }
+        return [$row[0], $row[1]];
     }
 
     /// @inheritdoc
@@ -46,8 +49,8 @@ SELECT a.google_spreadsheet_id
  ORDER BY a.last_seen
  LIMIT 1
 SQL;
-        $column = $this->database->query($sql)->fetchColumn();
-        return $column === false ? null : $column;
+        $column = $this->query($sql)->fetchColumn();
+        return is_string($column) ? $column : null;
     }
 
     /// @inheritdoc
@@ -274,24 +277,17 @@ SQL;
         $sqlPrefix = "INSERT INTO $quotedTargetTable ($quotedColumns) VALUES";
         $sqlOneValueList = implode(',', array_fill(0, count($columnNames) + 2, '?'));
         // Load each row for the selected columns
-        foreach (array_chunk($rows, $this->sqlInsertChunkSize, true) as $rowChunk) {
+        $chunkSize = $this->sqlInsertChunkSize;
+        if ($chunkSize < 1) {
+            throw new \InvalidArgumentException('sqlInsertChunkSize must be at least 1');
+        }
+        foreach (array_chunk($rows, $chunkSize, true) as $rowChunk) {
             $parameters = [];
             foreach ($rowChunk as $i => $row) {
                 array_push($parameters, $etlJobId, $i, ...$row);
             }
             $sqlValueLists = '(' . implode('),(', array_fill(0, count($rowChunk), $sqlOneValueList)) . ')';
             $statement = $this->database->prepare($sqlPrefix . $sqlValueLists);
-            /*
-                        // If there is an error inserting don't do this.
-                        // Instead in your client do SET sql_mode = 'NO_ENGINE_SUBSTITUTION';
-                        $parameters = array_map(function($v){
-                            return is_null($v)
-                                ? null
-                                : is_string($v)
-                                    ? substr($v, 0, 100)
-                                    : $v;
-                        }, $parameters);
-            */
             $statement->execute($parameters);
             echo '  ' . (array_key_last($rowChunk) + 1);
         }
@@ -336,14 +332,14 @@ SQL;
     {
         $retval = [];
         foreach ($columns as $index => $column) {
-            $column = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
-            $column = strtolower($column);
-            $column = preg_replace('/[^a-z0-9_ ]/', '', $column);
-            $column = trim($column);
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT', $column);
+            $column = strtolower($converted === false ? '' : $converted);
+            $replaced = preg_replace('/[^a-z0-9_ ]/', '', $column);
+            $column = trim($replaced ?? '');
             if (!preg_match('/^[a-z_]/', $column)) {
                 $column = '_' . $column;
             }
-            if (preg_match('/^col_[0-9]+$/', $column) || empty($column) || in_array($column, $retval)) {
+            if (preg_match('/^col_[0-9]+$/', $column) || in_array($column, $retval, true)) {
                 $column = 'col_' . ($index + 1);
             }
             array_push($retval, '`' . $column . '`');

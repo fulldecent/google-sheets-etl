@@ -70,6 +70,9 @@ abstract class DatabaseAgent
     final public static function agentForPdo(\PDO $newDatabase): DatabaseAgent
     {
         $driver = $newDatabase->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if (!is_string($driver)) {
+            throw new \InvalidArgumentException('PDO driver name is not a string');
+        }
         return match ($driver) {
             'sqlite' => new DatabaseAgentSqlite($newDatabase),
             'mysql' => new DatabaseAgentMysql($newDatabase),
@@ -154,4 +157,14 @@ abstract class DatabaseAgent
         array $rows,
         string $hash,
     ): void;
+
+    protected function query(string $sql): \PDOStatement
+    {
+        $statement = $this->database->query($sql);
+        if ($statement === false) {
+            $info = $this->database->errorInfo();
+            throw new \RuntimeException(is_string($info[2] ?? null) ? $info[2] : 'Query failed');
+        }
+        return $statement;
+    }
 }
